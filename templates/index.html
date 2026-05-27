@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ChurnGuard — Churn Risk Assessment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: { navy: { DEFAULT: '#0a2342', mid: '#0d2d52', light: '#1a4070' } }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    select {
+      -webkit-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%236b7280' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-900 antialiased" style="font-family:'Inter',system-ui,sans-serif;">
+
+  <!-- Header -->
+  <header class="bg-[#0a2342] border-b border-[#0d2d52]">
+    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-bold text-[15px] tracking-wide">ChurnGuard</span>
+        <span class="hidden sm:block w-px h-4 bg-white/20"></span>
+        <span class="hidden sm:block text-blue-300 text-xs font-medium">Customer Analytics Platform</span>
+      </div>
+      <a href="https://github.com/shraddharaom/customer-churn-prediction" target="_blank" rel="noopener"
+         class="text-xs font-semibold text-blue-200 hover:text-white transition-colors tracking-wide">
+        View on GitHub
+      </a>
+    </div>
+  </header>
+
+  <!-- Page title bar -->
+  <div class="bg-[#0d2d52] border-b border-[#1a4070]">
+    <div class="max-w-5xl mx-auto px-6 py-5">
+      <h1 class="text-white text-[17px] font-semibold">Churn Risk Assessment</h1>
+      <p class="text-blue-200/80 text-[13px] mt-1">Complete the customer profile below to generate a machine learning–powered churn probability analysis.</p>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <main class="max-w-5xl mx-auto px-6 py-6 pb-20">
+
+    <form id="churn-form" class="space-y-4">
+
+      <!-- Personal Information -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Personal Information</h2>
+        </div>
+        <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Customer Name</label>
+            <input type="text" name="name" placeholder="Jane Doe" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Age</label>
+            <input type="number" name="age" min="18" max="100" placeholder="35" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Geography</label>
+            <select name="geography" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
+              <option value="">Select country</option>
+              <optgroup label="Europe">
+                <option>Albania</option><option>Armenia</option><option>Austria</option>
+                <option>Azerbaijan</option><option>Belarus</option><option>Belgium</option>
+                <option>Bosnia</option><option>Bulgaria</option><option>Croatia</option>
+                <option>Cyprus</option><option>Czech Republic</option><option>Denmark</option>
+                <option>Estonia</option><option>Finland</option><option>France</option>
+                <option>Georgia</option><option>Germany</option><option>Greece</option>
+                <option>Hungary</option><option>Iceland</option><option>Ireland</option>
+                <option>Italy</option><option>Kosovo</option><option>Latvia</option>
+                <option>Lithuania</option><option>Luxembourg</option><option>Malta</option>
+                <option>Moldova</option><option>Montenegro</option><option>Netherlands</option>
+                <option>North Macedonia</option><option>Norway</option><option>Poland</option>
+                <option>Portugal</option><option>Romania</option><option>Russia</option>
+                <option>Serbia</option><option>Slovakia</option><option>Slovenia</option>
+                <option>Spain</option><option>Sweden</option><option>Switzerland</option>
+                <option>Ukraine</option><option>United Kingdom</option>
+              </optgroup>
+              <optgroup label="Middle East">
+                <option>Afghanistan</option><option>Bahrain</option><option>Iran</option>
+                <option>Iraq</option><option>Israel</option><option>Jordan</option>
+                <option>Kazakhstan</option><option>Kuwait</option><option>Lebanon</option>
+                <option>Oman</option><option>Pakistan</option><option>Qatar</option>
+                <option>Saudi Arabia</option><option>Syria</option><option>Turkey</option>
+                <option>UAE</option><option>Uzbekistan</option><option>Yemen</option>
+              </optgroup>
+              <optgroup label="Asia Pacific">
+                <option>Australia</option><option>Bangladesh</option><option>Cambodia</option>
+                <option>China</option><option>Hong Kong</option><option>India</option>
+                <option>Indonesia</option><option>Japan</option><option>Laos</option>
+                <option>Malaysia</option><option>Mongolia</option><option>Myanmar</option>
+                <option>Nepal</option><option>New Zealand</option><option>Philippines</option>
+                <option>Singapore</option><option>South Korea</option><option>Sri Lanka</option>
+                <option>Taiwan</option><option>Thailand</option><option>Vietnam</option>
+              </optgroup>
+              <optgroup label="Americas">
+                <option>Argentina</option><option>Bolivia</option><option>Brazil</option>
+                <option>Canada</option><option>Chile</option><option>Colombia</option>
+                <option>Costa Rica</option><option>Cuba</option><option>Dominican Republic</option>
+                <option>Ecuador</option><option>El Salvador</option><option>Guatemala</option>
+                <option>Haiti</option><option>Honduras</option><option>Jamaica</option>
+                <option>Mexico</option><option>Nicaragua</option><option>Panama</option>
+                <option>Paraguay</option><option>Peru</option><option>Puerto Rico</option>
+                <option>United States</option><option>Uruguay</option><option>Venezuela</option>
+              </optgroup>
+              <optgroup label="Africa">
+                <option>Algeria</option><option>Angola</option><option>Botswana</option>
+                <option>Burkina Faso</option><option>Cameroon</option><option>Chad</option>
+                <option>Congo</option><option>Egypt</option><option>Eritrea</option>
+                <option>Ethiopia</option><option>Ghana</option><option>Guinea</option>
+                <option>Ivory Coast</option><option>Kenya</option><option>Libya</option>
+                <option>Madagascar</option><option>Malawi</option><option>Mali</option>
+                <option>Morocco</option><option>Mozambique</option><option>Namibia</option>
+                <option>Niger</option><option>Nigeria</option><option>Rwanda</option>
+                <option>Senegal</option><option>Somalia</option><option>South Africa</option>
+                <option>Sudan</option><option>Tanzania</option><option>Tunisia</option>
+                <option>Uganda</option><option>Zambia</option><option>Zimbabwe</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Gender</label>
+            <select name="gender" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
+              <option value="">Select gender</option>
+              <option>Male</option>
+              <option>Female</option>
+            </select>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Financial Details -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Financial Details</h2>
+        </div>
+        <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Credit Score</label>
+            <input type="number" name="credit_score" min="300" max="850" placeholder="650" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Account Balance (USD)</label>
+            <input type="number" name="balance" min="0" placeholder="60000" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Estimated Annual Salary (USD)</label>
+            <input type="number" name="salary" min="0" placeholder="75000" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Tenure with Bank (years)</label>
+            <input type="number" name="tenure" min="0" max="10" placeholder="5" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Account Status -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Account Status</h2>
+        </div>
+        <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Number of Products</label>
+            <select name="num_products" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
+              <option value="">Select</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Holds Credit Card</label>
+            <select name="has_cr_card" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
+              <option value="">Select</option>
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Active Member</label>
+            <select name="is_active" required
+              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
+                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
+              <option value="">Select</option>
+              <option value="1">Yes</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" id="submit-btn"
+        class="w-full bg-[#0a2342] hover:bg-[#0d2d52] text-white text-sm font-semibold
+               uppercase tracking-wider py-3.5 px-6 transition-colors
+               disabled:opacity-60 disabled:cursor-not-allowed">
+        Generate Churn Assessment
+      </button>
+
+    </form>
+
+    <!-- Error -->
+    <div id="error-box" class="hidden mt-4 border border-red-300 bg-red-50 px-5 py-4 text-sm text-red-800">
+      <span class="font-semibold">Error: </span><span id="error-msg"></span>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden mt-6 space-y-4">
+
+      <!-- Risk Assessment -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Risk Assessment</h2>
+          <span class="text-[11px] text-gray-400 uppercase tracking-wide">5-Model Ensemble</span>
+        </div>
+        <div class="px-6 py-6">
+          <div class="grid grid-cols-1 md:grid-cols-5 gap-8 items-center">
+
+            <!-- Doughnut -->
+            <div class="md:col-span-2 flex flex-col items-center">
+              <div class="relative w-44 h-44">
+                <canvas id="donut-chart"></canvas>
+                <div class="absolute inset-0 flex flex-col items-center justify-center select-none">
+                  <span id="donut-pct" class="text-[2.25rem] font-bold tabular-nums leading-none"></span>
+                  <span class="text-[11px] text-gray-400 mt-1.5 uppercase tracking-wide">avg probability</span>
+                </div>
+              </div>
+              <div class="mt-5 text-center">
+                <div id="risk-classification" class="text-sm font-bold uppercase tracking-widest"></div>
+                <div class="text-[11px] text-gray-400 mt-1">Churn Classification</div>
+              </div>
+            </div>
+
+            <!-- Vertical divider -->
+            <div class="hidden md:block w-px self-stretch bg-gray-100 mx-2"></div>
+
+            <!-- Bar chart (takes remaining space) -->
+            <div class="md:col-span-2" style="position:relative; height:210px;">
+              <canvas id="bar-chart"></canvas>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Model Scores Table -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Individual Model Scores</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-100">
+                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Model</th>
+                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Churn Probability</th>
+                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Classification</th>
+              </tr>
+            </thead>
+            <tbody id="scores-table" class="divide-y divide-gray-50"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- AI Analysis -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">AI Analysis</h2>
+          <span class="text-[11px] text-gray-400 uppercase tracking-wide">OpenAI GPT-4o</span>
+        </div>
+        <div class="px-6 py-5">
+          <p id="explanation-text" class="text-[14px] text-gray-700 leading-relaxed"></p>
+        </div>
+      </div>
+
+      <!-- Retention Email -->
+      <div class="bg-white border border-gray-200">
+        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Retention Email Draft</h2>
+          <button id="copy-btn"
+            class="text-[11px] font-semibold uppercase tracking-wide text-gray-500
+                   border border-gray-300 px-3 py-1.5 hover:border-gray-400 hover:text-gray-700 transition-colors">
+            Copy
+          </button>
+        </div>
+        <div class="px-6 py-5">
+          <div id="email-text"
+            class="bg-gray-50 border border-gray-200 p-5 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 bg-white mt-4">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-400 uppercase tracking-wide">
+      <span>ChurnGuard &middot; Open Source &middot; MIT License</span>
+      <span>Flask &middot; scikit-learn &middot; XGBoost &middot; OpenAI GPT-4o</span>
+    </div>
+  </footer>
+
+<script>
+  let donutChart = null;
+  let barChart   = null;
+
+  const RISK = {
+    low:    { color: '#166534', bg: '#f0fdf4', border: '#bbf7d0', label: 'Low Risk'    },
+    medium: { color: '#92400e', bg: '#fffbeb', border: '#fde68a', label: 'Medium Risk' },
+    high:   { color: '#991b1b', bg: '#fef2f2', border: '#fecaca', label: 'High Risk'   },
+  };
+  const CHART_COLORS = { low: '#16a34a', medium: '#d97706', high: '#dc2626' };
+
+  function lvl(p) { return p < 0.4 ? 'low' : p < 0.7 ? 'medium' : 'high'; }
+  function pct(p) { return (p * 100).toFixed(1) + '%'; }
+
+  // Form submit
+  document.getElementById('churn-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn     = document.getElementById('submit-btn');
+    const errBox  = document.getElementById('error-box');
+    const results = document.getElementById('results');
+
+    btn.disabled = true;
+    btn.textContent = 'Analyzing…';
+    results.classList.add('hidden');
+    errBox.classList.add('hidden');
+
+    try {
+      const resp = await fetch('/predict', { method: 'POST', body: new FormData(e.target) });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Server error ' + resp.status);
+      renderResults(data);
+      results.classList.remove('hidden');
+      setTimeout(() => results.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    } catch (err) {
+      document.getElementById('error-msg').textContent = err.message;
+      errBox.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate Churn Assessment';
+    }
+  });
+
+  function renderResults(data) {
+    const prob = data.churn_probability;
+    const l    = lvl(prob);
+    const r    = RISK[l];
+
+    // Donut center text
+    const pctEl = document.getElementById('donut-pct');
+    pctEl.textContent = pct(prob);
+    pctEl.style.color = r.color;
+
+    // Risk classification text
+    const cls = document.getElementById('risk-classification');
+    cls.textContent = r.label.toUpperCase();
+    cls.style.color = r.color;
+
+    // Destroy old charts
+    if (donutChart) { donutChart.destroy(); donutChart = null; }
+    if (barChart)   { barChart.destroy();   barChart   = null; }
+
+    // Doughnut
+    donutChart = new Chart(document.getElementById('donut-chart'), {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [prob, 1 - prob],
+          backgroundColor: [CHART_COLORS[l], '#e5e7eb'],
+          borderWidth: 0,
+          hoverOffset: 0,
+        }]
+      },
+      options: {
+        cutout: '80%',
+        animation: { duration: 800, easing: 'easeInOutQuart' },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      }
+    });
+
+    // Bar chart
+    const models = Object.entries(data.model_scores);
+    barChart = new Chart(document.getElementById('bar-chart'), {
+      type: 'bar',
+      data: {
+        labels: models.map(([name]) => name),
+        datasets: [{
+          label: 'Churn Probability',
+          data: models.map(([, s]) => parseFloat((s * 100).toFixed(1))),
+          backgroundColor: models.map(([, s]) => CHART_COLORS[lvl(s)] + '22'),
+          borderColor:     models.map(([, s]) => CHART_COLORS[lvl(s)]),
+          borderWidth: 1.5,
+          borderRadius: 2,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 600 },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0a2342',
+            padding: 10,
+            titleFont: { family: 'Inter', size: 11, weight: '600' },
+            bodyFont:  { family: 'Inter', size: 11 },
+            callbacks: { label: ctx => `  ${ctx.parsed.x}% churn probability` }
+          }
+        },
+        scales: {
+          x: {
+            min: 0, max: 100,
+            grid:   { color: '#f3f4f6' },
+            border: { display: false },
+            ticks: {
+              callback: v => v + '%',
+              font: { size: 10, family: 'Inter' },
+              color: '#9ca3af',
+              maxTicksLimit: 6,
+            }
+          },
+          y: {
+            grid:   { display: false },
+            border: { display: false },
+            ticks: {
+              font: { size: 11, weight: '500', family: 'Inter' },
+              color: '#4b5563',
+            }
+          }
+        }
+      }
+    });
+
+    // Scores table
+    const tbody = document.getElementById('scores-table');
+    tbody.innerHTML = '';
+    for (const [model, score] of models) {
+      const ml = lvl(score);
+      const mr = RISK[ml];
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="px-6 py-3 text-sm font-medium text-gray-800">${model}</td>
+        <td class="px-6 py-3 text-sm tabular-nums text-gray-700">${pct(score)}</td>
+        <td class="px-6 py-3">
+          <span class="text-[11px] font-bold uppercase tracking-wide" style="color:${mr.color}">
+            ${mr.label}
+          </span>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+    // Average row
+    const avgTr = document.createElement('tr');
+    avgTr.className = 'bg-gray-50 border-t border-gray-200';
+    avgTr.innerHTML = `
+      <td class="px-6 py-3 text-sm font-bold text-gray-800">Ensemble Average</td>
+      <td class="px-6 py-3 text-sm font-bold tabular-nums" style="color:${r.color}">${pct(prob)}</td>
+      <td class="px-6 py-3">
+        <span class="text-[11px] font-bold uppercase tracking-wide" style="color:${r.color}">
+          ${r.label}
+        </span>
+      </td>`;
+    tbody.appendChild(avgTr);
+
+    // Text
+    document.getElementById('explanation-text').textContent = data.explanation || '—';
+    document.getElementById('email-text').textContent       = data.email       || '—';
+
+    resetCopyBtn();
+  }
+
+  function resetCopyBtn() {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copy';
+    btn.className = 'text-[11px] font-semibold uppercase tracking-wide text-gray-500 border border-gray-300 px-3 py-1.5 hover:border-gray-400 hover:text-gray-700 transition-colors';
+  }
+
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('email-text').textContent).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = 'Copied';
+      btn.className = 'text-[11px] font-semibold uppercase tracking-wide text-green-700 border border-green-300 bg-green-50 px-3 py-1.5';
+      setTimeout(resetCopyBtn, 2000);
+    });
+  });
+</script>
+</body>
+</html>
