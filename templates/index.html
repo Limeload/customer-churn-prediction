@@ -1,542 +1,559 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ChurnGuard — Churn Risk Assessment</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-          colors: { navy: { DEFAULT: '#0a2342', mid: '#0d2d52', light: '#1a4070' } }
-        }
-      }
+{% extends "base.html" %}
+
+{% block title %}ChurnGuard — Churn Risk Assessment{% endblock %}
+{% block nav_predict %}active{% endblock %}
+{% block head_extra %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>{% endblock %}
+
+{% block styles %}
+    /* ── Dataset tabs ── */
+    .ds-tabs { display:flex; gap:2px; margin-bottom:2px; }
+    .ds-tab {
+      flex:1; padding:10px 16px; background:#fff; border:1px solid var(--border);
+      font-family:inherit; font-size:11px; font-weight:700; letter-spacing:.09em;
+      text-transform:uppercase; color:var(--gray); cursor:pointer; transition:.15s; text-align:left;
     }
-  </script>
-  <style>
-    body { font-family: 'Inter', system-ui, sans-serif; }
+    .ds-tab small { display:block; font-size:10px; font-weight:400; letter-spacing:.03em; text-transform:none; color:var(--muted); margin-top:2px; }
+    .ds-tab:hover { border-color:var(--salmon); color:var(--ink); }
+    .ds-tab.active { border-color:var(--salmon); color:var(--ink); background:var(--salmon10); }
+    .ds-tab.active small { color:var(--salmon); }
+
+    /* ── Form grids ── */
+    .fg3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 16px; }
+    .fg2 { display:grid; grid-template-columns:1fr 1fr; gap:14px 16px; }
+    .col2 { grid-column:span 2; }
+    .col3 { grid-column:span 3; }
+    @media(max-width:420px) { .fg3,.fg2 { grid-template-columns:1fr 1fr; } .col3 { grid-column:span 2; } }
+    .divrow { grid-column:1/-1; height:1px; background:var(--soft); margin:4px 0; }
+
+    label.fl { display:block; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--gray); margin-bottom:5px; }
+
+    input, select {
+      width:100%; border:1px solid var(--border); background:#fff;
+      padding:8px 11px; font-size:13px; font-family:inherit; color:var(--ink);
+      appearance:none; -webkit-appearance:none; transition:border-color .15s,box-shadow .15s;
+    }
+    input::placeholder { color:#b8b2ac; }
+    input:focus, select:focus { outline:none; border-color:var(--salmon); box-shadow:0 0 0 3px var(--salmon10); }
     select {
-      -webkit-appearance: none;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%236b7280' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 12px center;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath fill='%23646464' d='M0 0l4.5 5L9 0z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 10px center; padding-right:28px; cursor:pointer;
     }
-  </style>
-</head>
-<body class="bg-gray-100 text-gray-900 antialiased" style="font-family:'Inter',system-ui,sans-serif;">
 
-  <!-- Header -->
-  <header class="bg-[#0a2342] border-b border-[#0d2d52]">
-    <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-4">
-        <span class="text-white font-bold text-[15px] tracking-wide">ChurnGuard</span>
-        <span class="hidden sm:block w-px h-4 bg-white/20"></span>
-        <span class="hidden sm:block text-blue-300 text-xs font-medium">Customer Analytics Platform</span>
-      </div>
-      <a href="https://github.com/shraddharaom/customer-churn-prediction" target="_blank" rel="noopener"
-         class="text-xs font-semibold text-blue-200 hover:text-white transition-colors tracking-wide">
-        View on GitHub
-      </a>
-    </div>
-  </header>
+    /* ── LLM radio ── */
+    .llm-opts { display:flex; gap:8px; flex-wrap:wrap; }
+    .llm-opt {
+      display:flex; align-items:center; gap:7px; padding:7px 12px;
+      border:1px solid var(--border); cursor:pointer; font-size:12px;
+      font-weight:600; color:var(--gray); transition:.15s; user-select:none;
+    }
+    .llm-opt:hover { border-color:var(--salmon); color:var(--ink); }
+    .llm-opt input[type="radio"] { accent-color:var(--salmon); width:13px; height:13px; }
+    .llm-opt:has(input:checked) { border-color:var(--salmon); color:var(--ink); background:var(--salmon10); }
 
-  <!-- Page title bar -->
-  <div class="bg-[#0d2d52] border-b border-[#1a4070]">
-    <div class="max-w-5xl mx-auto px-6 py-5">
-      <h1 class="text-white text-[17px] font-semibold">Churn Risk Assessment</h1>
-      <p class="text-blue-200/80 text-[13px] mt-1">Complete the customer profile below to generate a machine learning–powered churn probability analysis.</p>
-    </div>
-  </div>
+    /* ── Results ── */
+    #results { display:none; }
+    .res-eye { font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--salmon); margin-bottom:12px; }
+    .res-stack { display:flex; flex-direction:column; gap:2px; }
 
-  <!-- Main -->
-  <main class="max-w-5xl mx-auto px-6 py-6 pb-20">
+    /* ── Risk ── */
+    .risk-row { display:grid; grid-template-columns:160px 1px 1fr; gap:0 24px; align-items:center; }
+    @media(max-width:500px) { .risk-row { grid-template-columns:1fr; gap:24px; } .risk-sep { display:none; } }
+    .risk-sep { width:1px; align-self:stretch; background:var(--soft); }
+    .donut-wrap { position:relative; width:140px; height:140px; margin:0 auto; }
+    .donut-center { position:absolute; inset:0; pointer-events:none; user-select:none; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .donut-pct { font-size:1.65rem; font-weight:700; letter-spacing:-.02em; line-height:1; }
+    .donut-sub { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:4px; }
+    .risk-lbl-wrap { text-align:center; margin-top:12px; }
+    .risk-cls { font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+    .risk-cls-sub { font-size:9px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase; margin-top:3px; }
 
-    <form id="churn-form" class="space-y-4">
+    /* ── Analysis + email ── */
+    .analysis-p { font-size:14px; font-weight:300; line-height:1.7; color:var(--charcoal); }
+    .email-pre { padding:14px 18px; font-size:13px; font-weight:300; line-height:1.8; color:var(--charcoal); white-space:pre-wrap; background:var(--seashell); border:1px solid var(--soft); }
 
-      <!-- Personal Information -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Personal Information</h2>
-        </div>
-        <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+    /* ── Copy btn ── */
+    .copy-btn { font-family:inherit; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--gray); background:transparent; border:1px solid var(--border); padding:4px 11px; cursor:pointer; transition:.2s; }
+    .copy-btn:hover { border-color:var(--gray); color:var(--ink); }
+    .copy-btn.ok { color:#2d7a3c; border-color:#a8d5b0; background:#f0faf2; }
+{% endblock %}
 
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Customer Name</label>
-            <input type="text" name="name" placeholder="Jane Doe" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
-          </div>
+{% block hero %}
+  <p class="hero-eye">Customer Analytics</p>
+  <h1 class="hero-title">Predict Customer Churn.</h1>
+  <p class="hero-sub">Fill in customer details on the left — ML predictions and AI analysis appear on the right.</p>
+{% endblock %}
 
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Age</label>
-            <input type="number" name="age" min="18" max="100" placeholder="35" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
-          </div>
+{% block footer_stack %}Flask &middot; scikit-learn &middot; XGBoost &middot; GPT-4o &middot; Groq{% endblock %}
 
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Geography</label>
-            <select name="geography" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
-              <option value="">Select country</option>
-              <optgroup label="Europe">
-                <option>Albania</option><option>Armenia</option><option>Austria</option>
-                <option>Azerbaijan</option><option>Belarus</option><option>Belgium</option>
-                <option>Bosnia</option><option>Bulgaria</option><option>Croatia</option>
-                <option>Cyprus</option><option>Czech Republic</option><option>Denmark</option>
-                <option>Estonia</option><option>Finland</option><option>France</option>
-                <option>Georgia</option><option>Germany</option><option>Greece</option>
-                <option>Hungary</option><option>Iceland</option><option>Ireland</option>
-                <option>Italy</option><option>Kosovo</option><option>Latvia</option>
-                <option>Lithuania</option><option>Luxembourg</option><option>Malta</option>
-                <option>Moldova</option><option>Montenegro</option><option>Netherlands</option>
-                <option>North Macedonia</option><option>Norway</option><option>Poland</option>
-                <option>Portugal</option><option>Romania</option><option>Russia</option>
-                <option>Serbia</option><option>Slovakia</option><option>Slovenia</option>
-                <option>Spain</option><option>Sweden</option><option>Switzerland</option>
-                <option>Ukraine</option><option>United Kingdom</option>
-              </optgroup>
-              <optgroup label="Middle East">
-                <option>Afghanistan</option><option>Bahrain</option><option>Iran</option>
-                <option>Iraq</option><option>Israel</option><option>Jordan</option>
-                <option>Kazakhstan</option><option>Kuwait</option><option>Lebanon</option>
-                <option>Oman</option><option>Pakistan</option><option>Qatar</option>
-                <option>Saudi Arabia</option><option>Syria</option><option>Turkey</option>
-                <option>UAE</option><option>Uzbekistan</option><option>Yemen</option>
-              </optgroup>
-              <optgroup label="Asia Pacific">
-                <option>Australia</option><option>Bangladesh</option><option>Cambodia</option>
-                <option>China</option><option>Hong Kong</option><option>India</option>
-                <option>Indonesia</option><option>Japan</option><option>Laos</option>
-                <option>Malaysia</option><option>Mongolia</option><option>Myanmar</option>
-                <option>Nepal</option><option>New Zealand</option><option>Philippines</option>
-                <option>Singapore</option><option>South Korea</option><option>Sri Lanka</option>
-                <option>Taiwan</option><option>Thailand</option><option>Vietnam</option>
-              </optgroup>
-              <optgroup label="Americas">
-                <option>Argentina</option><option>Bolivia</option><option>Brazil</option>
-                <option>Canada</option><option>Chile</option><option>Colombia</option>
-                <option>Costa Rica</option><option>Cuba</option><option>Dominican Republic</option>
-                <option>Ecuador</option><option>El Salvador</option><option>Guatemala</option>
-                <option>Haiti</option><option>Honduras</option><option>Jamaica</option>
-                <option>Mexico</option><option>Nicaragua</option><option>Panama</option>
-                <option>Paraguay</option><option>Peru</option><option>Puerto Rico</option>
-                <option>United States</option><option>Uruguay</option><option>Venezuela</option>
-              </optgroup>
-              <optgroup label="Africa">
-                <option>Algeria</option><option>Angola</option><option>Botswana</option>
-                <option>Burkina Faso</option><option>Cameroon</option><option>Chad</option>
-                <option>Congo</option><option>Egypt</option><option>Eritrea</option>
-                <option>Ethiopia</option><option>Ghana</option><option>Guinea</option>
-                <option>Ivory Coast</option><option>Kenya</option><option>Libya</option>
-                <option>Madagascar</option><option>Malawi</option><option>Mali</option>
-                <option>Morocco</option><option>Mozambique</option><option>Namibia</option>
-                <option>Niger</option><option>Nigeria</option><option>Rwanda</option>
-                <option>Senegal</option><option>Somalia</option><option>South Africa</option>
-                <option>Sudan</option><option>Tanzania</option><option>Tunisia</option>
-                <option>Uganda</option><option>Zambia</option><option>Zimbabwe</option>
-              </optgroup>
-            </select>
-          </div>
+{% block content %}
+<div class="page">
 
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Gender</label>
-            <select name="gender" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
-              <option value="">Select gender</option>
-              <option>Male</option>
-              <option>Female</option>
-            </select>
-          </div>
+  <!-- ══ LEFT: Forms ══ -->
+  <div class="col-left">
 
-        </div>
-      </div>
-
-      <!-- Financial Details -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Financial Details</h2>
-        </div>
-        <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Credit Score</label>
-            <input type="number" name="credit_score" min="300" max="850" placeholder="650" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Account Balance (USD)</label>
-            <input type="number" name="balance" min="0" placeholder="60000" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Estimated Annual Salary (USD)</label>
-            <input type="number" name="salary" min="0" placeholder="75000" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Tenure with Bank (years)</label>
-            <input type="number" name="tenure" min="0" max="10" placeholder="5" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition"/>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Account Status -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Account Status</h2>
-        </div>
-        <div class="px-6 py-5 grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Number of Products</label>
-            <select name="num_products" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
-              <option value="">Select</option>
-              <option>1</option><option>2</option><option>3</option><option>4</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Holds Credit Card</label>
-            <select name="has_cr_card" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
-              <option value="">Select</option>
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Active Member</label>
-            <select name="is_active" required
-              class="w-full border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900
-                     focus:outline-none focus:border-[#0a2342] focus:ring-1 focus:ring-[#0a2342]/20 transition">
-              <option value="">Select</option>
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Submit -->
-      <button type="submit" id="submit-btn"
-        class="w-full bg-[#0a2342] hover:bg-[#0d2d52] text-white text-sm font-semibold
-               uppercase tracking-wider py-3.5 px-6 transition-colors
-               disabled:opacity-60 disabled:cursor-not-allowed">
-        Generate Churn Assessment
+    <!-- Dataset tabs -->
+    <div class="ds-tabs">
+      <button type="button" class="ds-tab active" data-ds="bank">
+        Bank Churn
+        <small>7 models · 10K rows · Kaggle</small>
       </button>
+      <button type="button" class="ds-tab" data-ds="telco">
+        Telco Churn
+        <small>5 models · 7K rows · IBM</small>
+      </button>
+    </div>
 
+    <!-- BANK FORM -->
+    <form id="form-bank" data-endpoint="/predict">
+      <div class="card">
+        <div class="card-hdr"><span class="card-lbl">Customer Profile</span></div>
+        <div class="card-body">
+          <div class="fg3">
+            <div class="col2">
+              <label class="fl">Name</label>
+              <input type="text" name="name" placeholder="Jane Doe" value="Jane Smith" required>
+            </div>
+            <div>
+              <label class="fl">Age</label>
+              <input type="number" name="age" min="18" max="100" placeholder="35" value="42" required>
+            </div>
+
+            <div class="divrow"></div>
+
+            <div class="col3">
+              <label class="fl">Geography</label>
+              <select name="geography" required>
+                <option value="">—</option>
+                <option value="France" selected>Western Europe &amp; Americas</option>
+                <option value="Germany">Central / Eastern Europe &amp; Middle East</option>
+                <option value="Spain">Southern Europe, Africa &amp; Asia</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Gender</label>
+              <select name="gender" required>
+                <option value="">—</option>
+                <option selected>Female</option><option>Male</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Credit Score</label>
+              <input type="number" name="credit_score" min="300" max="850" placeholder="650" value="650" required>
+            </div>
+            <div>
+              <label class="fl">Balance ($)</label>
+              <input type="number" name="balance" min="0" placeholder="60000" value="75000" required>
+            </div>
+
+            <div class="divrow"></div>
+
+            <div>
+              <label class="fl">Salary ($)</label>
+              <input type="number" name="salary" min="0" placeholder="75000" value="85000" required>
+            </div>
+            <div>
+              <label class="fl">Tenure (yrs)</label>
+              <input type="number" name="tenure" min="0" max="10" placeholder="5" value="5" required>
+            </div>
+            <div>
+              <label class="fl">Products</label>
+              <select name="num_products" required>
+                <option value="">—</option>
+                <option>1</option><option selected>2</option><option>3</option><option>4</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Credit Card</label>
+              <select name="has_cr_card" required>
+                <option value="">—</option>
+                <option value="1" selected>Yes</option><option value="0">No</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Active Member</label>
+              <select name="is_active" required>
+                <option value="">—</option>
+                <option value="1" selected>Yes</option><option value="0">No</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-lbl">AI Model</span>
+          <span class="card-meta">Explanation &amp; Email</span>
+        </div>
+        <div class="card-body">
+          <div class="llm-opts">
+            <label class="llm-opt"><input type="radio" name="llm" value="openai" checked><span>OpenAI GPT-4o</span></label>
+            <label class="llm-opt"><input type="radio" name="llm" value="groq"><span>Groq Llama 3.3 70B</span></label>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn submit-btn">Generate Assessment</button>
     </form>
 
-    <!-- Error -->
-    <div id="error-box" class="hidden mt-4 border border-red-300 bg-red-50 px-5 py-4 text-sm text-red-800">
-      <span class="font-semibold">Error: </span><span id="error-msg"></span>
+    <!-- TELCO FORM -->
+    <form id="form-telco" data-endpoint="/predict-telco" style="display:none;">
+      <div class="card">
+        <div class="card-hdr"><span class="card-lbl">Customer Profile</span></div>
+        <div class="card-body">
+          <div class="fg3">
+            <div class="col2">
+              <label class="fl">Name</label>
+              <input type="text" name="name" placeholder="Jane Doe" value="John Rivera" required>
+            </div>
+            <div>
+              <label class="fl">Gender</label>
+              <select name="gender" required>
+                <option value="">—</option>
+                <option>Female</option><option selected>Male</option>
+              </select>
+            </div>
+
+            <div class="divrow"></div>
+
+            <div>
+              <label class="fl">Tenure (mo)</label>
+              <input type="number" name="tenure" min="0" max="72" placeholder="24" value="12" required>
+            </div>
+            <div>
+              <label class="fl">Monthly ($)</label>
+              <input type="number" name="monthly_charges" min="0" step="0.01" placeholder="65.00" value="89.85" required>
+            </div>
+            <div>
+              <label class="fl">Total ($)</label>
+              <input type="number" name="total_charges" min="0" step="0.01" placeholder="1500" value="1078.20" required>
+            </div>
+            <div class="col2">
+              <label class="fl">Contract</label>
+              <select name="contract" required>
+                <option value="">—</option>
+                <option value="Month-to-month" selected>Month-to-month</option>
+                <option value="One year">One year</option>
+                <option value="Two year">Two year</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Senior Citizen</label>
+              <select name="senior_citizen" required>
+                <option value="">—</option>
+                <option value="0" selected>No</option><option value="1">Yes</option>
+              </select>
+            </div>
+
+            <div class="divrow"></div>
+
+            <div>
+              <label class="fl">Internet</label>
+              <select name="internet_service" required>
+                <option value="">—</option>
+                <option value="DSL">DSL</option>
+                <option value="Fiber optic" selected>Fiber optic</option>
+                <option value="No">None</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Phone</label>
+              <select name="phone_service" required>
+                <option value="">—</option>
+                <option value="Yes" selected>Yes</option><option value="No">No</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Multi Lines</label>
+              <select name="multiple_lines">
+                <option value="No" selected>No</option><option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Security</label>
+              <select name="online_security">
+                <option value="No" selected>No</option><option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Backup</label>
+              <select name="online_backup">
+                <option value="No" selected>No</option><option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Tech Support</label>
+              <select name="tech_support">
+                <option value="No" selected>No</option><option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Streaming TV</label>
+              <select name="streaming_tv">
+                <option value="No">No</option><option value="Yes" selected>Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Streaming Movies</label>
+              <select name="streaming_movies">
+                <option value="No">No</option><option value="Yes" selected>Yes</option>
+              </select>
+            </div>
+
+            <div class="divrow"></div>
+
+            <div class="col2">
+              <label class="fl">Payment Method</label>
+              <select name="payment_method" required>
+                <option value="">—</option>
+                <option value="Electronic check" selected>Electronic check</option>
+                <option value="Mailed check">Mailed check</option>
+                <option value="Bank transfer (automatic)">Bank transfer</option>
+                <option value="Credit card (automatic)">Credit card</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Paperless</label>
+              <select name="paperless_billing" required>
+                <option value="">—</option>
+                <option value="Yes" selected>Yes</option><option value="No">No</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Partner</label>
+              <select name="partner">
+                <option value="No" selected>No</option><option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="fl">Dependents</label>
+              <select name="dependents">
+                <option value="No" selected>No</option><option value="Yes">Yes</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-lbl">AI Model</span>
+          <span class="card-meta">Explanation &amp; Email</span>
+        </div>
+        <div class="card-body">
+          <div class="llm-opts">
+            <label class="llm-opt"><input type="radio" name="llm" value="openai" checked><span>OpenAI GPT-4o</span></label>
+            <label class="llm-opt"><input type="radio" name="llm" value="groq"><span>Groq Llama 3.3 70B</span></label>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn submit-btn">Generate Assessment</button>
+    </form>
+  </div>
+
+  <!-- ══ RIGHT: Output ══ -->
+  <div class="col-right">
+
+    <div id="error-box" class="err">
+      <strong>Error:</strong> <span id="error-msg"></span>
     </div>
 
-    <!-- Results -->
-    <div id="results" class="hidden mt-6 space-y-4">
+    <div id="placeholder" class="placeholder">
+      <div class="placeholder-dot">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+      </div>
+      <div>
+        <p class="placeholder-title">No assessment yet</p>
+        <p class="placeholder-sub">Fill in the customer profile and click Generate Assessment to see results here.</p>
+      </div>
+    </div>
 
-      <!-- Risk Assessment -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Risk Assessment</h2>
-          <span class="text-[11px] text-gray-400 uppercase tracking-wide">5-Model Ensemble</span>
-        </div>
-        <div class="px-6 py-6">
-          <div class="grid grid-cols-1 md:grid-cols-5 gap-8 items-center">
+    <div id="results">
+      <p class="res-eye">Analysis Results</p>
+      <div class="res-stack">
 
-            <!-- Doughnut -->
-            <div class="md:col-span-2 flex flex-col items-center">
-              <div class="relative w-44 h-44">
-                <canvas id="donut-chart"></canvas>
-                <div class="absolute inset-0 flex flex-col items-center justify-center select-none">
-                  <span id="donut-pct" class="text-[2.25rem] font-bold tabular-nums leading-none"></span>
-                  <span class="text-[11px] text-gray-400 mt-1.5 uppercase tracking-wide">avg probability</span>
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-lbl">Risk Assessment</span>
+            <span id="res-ds-label" class="card-meta"></span>
+          </div>
+          <div class="card-body">
+            <div class="risk-row">
+              <div>
+                <div class="donut-wrap">
+                  <canvas id="donut-chart"></canvas>
+                  <div class="donut-center">
+                    <span id="donut-pct" class="donut-pct"></span>
+                    <span class="donut-sub">avg prob</span>
+                  </div>
+                </div>
+                <div class="risk-lbl-wrap">
+                  <div id="risk-cls" class="risk-cls"></div>
+                  <div class="risk-cls-sub">Churn Risk</div>
                 </div>
               </div>
-              <div class="mt-5 text-center">
-                <div id="risk-classification" class="text-sm font-bold uppercase tracking-widest"></div>
-                <div class="text-[11px] text-gray-400 mt-1">Churn Classification</div>
+              <div class="risk-sep"></div>
+              <div style="position:relative;height:260px;">
+                <canvas id="bar-chart"></canvas>
               </div>
             </div>
-
-            <!-- Vertical divider -->
-            <div class="hidden md:block w-px self-stretch bg-gray-100 mx-2"></div>
-
-            <!-- Bar chart (takes remaining space) -->
-            <div class="md:col-span-2" style="position:relative; height:210px;">
-              <canvas id="bar-chart"></canvas>
-            </div>
-
           </div>
         </div>
-      </div>
 
-      <!-- Model Scores Table -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Individual Model Scores</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-100">
-                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Model</th>
-                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Churn Probability</th>
-                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">Classification</th>
-              </tr>
-            </thead>
-            <tbody id="scores-table" class="divide-y divide-gray-50"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- AI Analysis -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">AI Analysis</h2>
-          <span class="text-[11px] text-gray-400 uppercase tracking-wide">OpenAI GPT-4o</span>
-        </div>
-        <div class="px-6 py-5">
-          <p id="explanation-text" class="text-[14px] text-gray-700 leading-relaxed"></p>
-        </div>
-      </div>
-
-      <!-- Retention Email -->
-      <div class="bg-white border border-gray-200">
-        <div class="px-6 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-          <h2 class="text-[11px] font-bold uppercase tracking-widest text-gray-500">Retention Email Draft</h2>
-          <button id="copy-btn"
-            class="text-[11px] font-semibold uppercase tracking-wide text-gray-500
-                   border border-gray-300 px-3 py-1.5 hover:border-gray-400 hover:text-gray-700 transition-colors">
-            Copy
-          </button>
-        </div>
-        <div class="px-6 py-5">
-          <div id="email-text"
-            class="bg-gray-50 border border-gray-200 p-5 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-lbl">AI Analysis</span>
+            <span id="llm-label" class="card-meta"></span>
           </div>
+          <div class="card-body">
+            <p id="explanation-text" class="analysis-p"></p>
+          </div>
+          <div class="card-divider"></div>
+          <div class="card-hdr">
+            <span class="card-lbl">Retention Email</span>
+            <button id="copy-btn" class="copy-btn" type="button">Copy</button>
+          </div>
+          <div id="email-text" class="email-pre"></div>
         </div>
+
       </div>
-
     </div>
-  </main>
+  </div>
+</div>
+{% endblock %}
 
-  <!-- Footer -->
-  <footer class="border-t border-gray-200 bg-white mt-4">
-    <div class="max-w-5xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-gray-400 uppercase tracking-wide">
-      <span>ChurnGuard &middot; Open Source &middot; MIT License</span>
-      <span>Flask &middot; scikit-learn &middot; XGBoost &middot; OpenAI GPT-4o</span>
-    </div>
-  </footer>
-
+{% block scripts %}
 <script>
-  let donutChart = null;
-  let barChart   = null;
+  let donutChart = null, barChart = null;
 
   const RISK = {
-    low:    { color: '#166534', bg: '#f0fdf4', border: '#bbf7d0', label: 'Low Risk'    },
-    medium: { color: '#92400e', bg: '#fffbeb', border: '#fde68a', label: 'Medium Risk' },
-    high:   { color: '#991b1b', bg: '#fef2f2', border: '#fecaca', label: 'High Risk'   },
+    low:    { color:'#2d7a3c', bg:'#f0faf2', border:'#a8d5b0', label:'Low Risk'    },
+    medium: { color:'#9a6300', bg:'#fdf8ed', border:'#f0d48a', label:'Medium Risk' },
+    high:   { color:'#c0392b', bg:'#fff8f7', border:'#f4b8b2', label:'High Risk'   },
   };
-  const CHART_COLORS = { low: '#16a34a', medium: '#d97706', high: '#dc2626' };
+  const CLR  = { low:'#3a8f4c', medium:'#c8820a', high:'#ff7360' };
+  const FONT = '"Source Sans 3","Source Sans Pro","Helvetica Neue",Arial,sans-serif';
 
   function lvl(p) { return p < 0.4 ? 'low' : p < 0.7 ? 'medium' : 'high'; }
   function pct(p) { return (p * 100).toFixed(1) + '%'; }
 
-  // Form submit
-  document.getElementById('churn-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn     = document.getElementById('submit-btn');
-    const errBox  = document.getElementById('error-box');
-    const results = document.getElementById('results');
-
-    btn.disabled = true;
-    btn.textContent = 'Analyzing…';
-    results.classList.add('hidden');
-    errBox.classList.add('hidden');
-
-    try {
-      const resp = await fetch('/predict', { method: 'POST', body: new FormData(e.target) });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'Server error ' + resp.status);
-      renderResults(data);
-      results.classList.remove('hidden');
-      setTimeout(() => results.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-    } catch (err) {
-      document.getElementById('error-msg').textContent = err.message;
-      errBox.classList.remove('hidden');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Generate Churn Assessment';
-    }
+  document.querySelectorAll('.ds-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ds-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const ds = tab.dataset.ds;
+      document.getElementById('form-bank').style.display  = ds === 'bank'  ? '' : 'none';
+      document.getElementById('form-telco').style.display = ds === 'telco' ? '' : 'none';
+      document.getElementById('results').style.display    = 'none';
+      document.getElementById('placeholder').style.display = '';
+      document.getElementById('error-box').style.display  = 'none';
+    });
   });
+
+  function attachSubmit(form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn    = form.querySelector('.submit-btn');
+      const errBox = document.getElementById('error-box');
+      const results = document.getElementById('results');
+      const ph     = document.getElementById('placeholder');
+
+      btn.disabled = true;
+      btn.textContent = 'Analyzing…';
+      errBox.style.display = 'none';
+
+      try {
+        const resp = await fetch(form.dataset.endpoint, { method:'POST', body:new FormData(form) });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Server error ' + resp.status);
+
+        const activeTab = document.querySelector('.ds-tab.active');
+        document.getElementById('res-ds-label').textContent =
+          activeTab ? activeTab.querySelector('small').textContent : '';
+
+        ph.style.display      = 'none';
+        results.style.display = 'block';
+        renderResults(data);
+      } catch (err) {
+        document.getElementById('error-msg').textContent = err.message;
+        errBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Assessment';
+      }
+    });
+  }
+
+  attachSubmit(document.getElementById('form-bank'));
+  attachSubmit(document.getElementById('form-telco'));
 
   function renderResults(data) {
     const prob = data.churn_probability;
-    const l    = lvl(prob);
-    const r    = RISK[l];
+    const l = lvl(prob), r = RISK[l];
 
-    // Donut center text
-    const pctEl = document.getElementById('donut-pct');
-    pctEl.textContent = pct(prob);
-    pctEl.style.color = r.color;
+    document.getElementById('donut-pct').textContent = pct(prob);
+    document.getElementById('donut-pct').style.color = r.color;
+    const cls = document.getElementById('risk-cls');
+    cls.textContent = r.label; cls.style.color = r.color;
 
-    // Risk classification text
-    const cls = document.getElementById('risk-classification');
-    cls.textContent = r.label.toUpperCase();
-    cls.style.color = r.color;
-
-    // Destroy old charts
     if (donutChart) { donutChart.destroy(); donutChart = null; }
     if (barChart)   { barChart.destroy();   barChart   = null; }
 
-    // Doughnut
     donutChart = new Chart(document.getElementById('donut-chart'), {
       type: 'doughnut',
-      data: {
-        datasets: [{
-          data: [prob, 1 - prob],
-          backgroundColor: [CHART_COLORS[l], '#e5e7eb'],
-          borderWidth: 0,
-          hoverOffset: 0,
-        }]
-      },
-      options: {
-        cutout: '80%',
-        animation: { duration: 800, easing: 'easeInOutQuart' },
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      }
+      data: { datasets: [{ data:[prob,1-prob], backgroundColor:[CLR[l],'#ede8e3'], borderWidth:0 }] },
+      options: { cutout:'82%', animation:{ duration:800, easing:'easeInOutQuart' }, plugins:{ legend:{ display:false }, tooltip:{ enabled:false } } }
     });
 
-    // Bar chart
     const models = Object.entries(data.model_scores);
     barChart = new Chart(document.getElementById('bar-chart'), {
       type: 'bar',
       data: {
-        labels: models.map(([name]) => name),
+        labels: models.map(([n]) => n),
         datasets: [{
-          label: 'Churn Probability',
-          data: models.map(([, s]) => parseFloat((s * 100).toFixed(1))),
-          backgroundColor: models.map(([, s]) => CHART_COLORS[lvl(s)] + '22'),
-          borderColor:     models.map(([, s]) => CHART_COLORS[lvl(s)]),
-          borderWidth: 1.5,
-          borderRadius: 2,
-          borderSkipped: false,
+          data:            models.map(([,s]) => parseFloat((s*100).toFixed(1))),
+          backgroundColor: models.map(([,s]) => CLR[lvl(s)] + '1a'),
+          borderColor:     models.map(([,s]) => CLR[lvl(s)]),
+          borderWidth:1.5, borderRadius:0, borderSkipped:false, minBarLength:4,
         }]
       },
       options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 600 },
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        animation:{ duration:500 },
         plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#0a2342',
-            padding: 10,
-            titleFont: { family: 'Inter', size: 11, weight: '600' },
-            bodyFont:  { family: 'Inter', size: 11 },
-            callbacks: { label: ctx => `  ${ctx.parsed.x}% churn probability` }
+          legend:{ display:false },
+          tooltip:{ backgroundColor:'#252525', padding:8,
+            titleFont:{ family:FONT, size:11, weight:'700' },
+            bodyFont:{ family:FONT, size:11 },
+            callbacks:{ label: ctx => `  ${ctx.parsed.x.toFixed(1)}% probability` }
           }
         },
         scales: {
-          x: {
-            min: 0, max: 100,
-            grid:   { color: '#f3f4f6' },
-            border: { display: false },
-            ticks: {
-              callback: v => v + '%',
-              font: { size: 10, family: 'Inter' },
-              color: '#9ca3af',
-              maxTicksLimit: 6,
-            }
-          },
-          y: {
-            grid:   { display: false },
-            border: { display: false },
-            ticks: {
-              font: { size: 11, weight: '500', family: 'Inter' },
-              color: '#4b5563',
-            }
-          }
+          x:{ min:0, max:100, border:{ display:false }, grid:{ color:'#ede8e3' },
+              ticks:{ callback:v=>v+'%', font:{ size:10, family:FONT }, color:'#9a9a9a', maxTicksLimit:5 } },
+          y:{ grid:{ display:false }, border:{ display:false },
+              ticks:{ font:{ size:11, weight:'600', family:FONT }, color:'#646464' } }
         }
       }
     });
 
-    // Scores table
-    const tbody = document.getElementById('scores-table');
-    tbody.innerHTML = '';
-    for (const [model, score] of models) {
-      const ml = lvl(score);
-      const mr = RISK[ml];
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="px-6 py-3 text-sm font-medium text-gray-800">${model}</td>
-        <td class="px-6 py-3 text-sm tabular-nums text-gray-700">${pct(score)}</td>
-        <td class="px-6 py-3">
-          <span class="text-[11px] font-bold uppercase tracking-wide" style="color:${mr.color}">
-            ${mr.label}
-          </span>
-        </td>`;
-      tbody.appendChild(tr);
-    }
-    // Average row
-    const avgTr = document.createElement('tr');
-    avgTr.className = 'bg-gray-50 border-t border-gray-200';
-    avgTr.innerHTML = `
-      <td class="px-6 py-3 text-sm font-bold text-gray-800">Ensemble Average</td>
-      <td class="px-6 py-3 text-sm font-bold tabular-nums" style="color:${r.color}">${pct(prob)}</td>
-      <td class="px-6 py-3">
-        <span class="text-[11px] font-bold uppercase tracking-wide" style="color:${r.color}">
-          ${r.label}
-        </span>
-      </td>`;
-    tbody.appendChild(avgTr);
-
-    // Text
     document.getElementById('explanation-text').textContent = data.explanation || '—';
     document.getElementById('email-text').textContent       = data.email       || '—';
-
-    resetCopyBtn();
+    document.getElementById('llm-label').textContent        = data.llm_label   || '';
+    resetCopy();
   }
 
-  function resetCopyBtn() {
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = 'Copy';
-    btn.className = 'text-[11px] font-semibold uppercase tracking-wide text-gray-500 border border-gray-300 px-3 py-1.5 hover:border-gray-400 hover:text-gray-700 transition-colors';
+  function resetCopy() {
+    const b = document.getElementById('copy-btn');
+    b.textContent = 'Copy'; b.className = 'copy-btn';
   }
-
   document.getElementById('copy-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(document.getElementById('email-text').textContent).then(() => {
-      const btn = document.getElementById('copy-btn');
-      btn.textContent = 'Copied';
-      btn.className = 'text-[11px] font-semibold uppercase tracking-wide text-green-700 border border-green-300 bg-green-50 px-3 py-1.5';
-      setTimeout(resetCopyBtn, 2000);
+      const b = document.getElementById('copy-btn');
+      b.textContent = 'Copied'; b.className = 'copy-btn ok';
+      setTimeout(resetCopy, 2000);
     });
   });
 </script>
-</body>
-</html>
+{% endblock %}

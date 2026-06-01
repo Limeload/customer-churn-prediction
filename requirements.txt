@@ -1,12 +1,17 @@
 pandas
 numpy
 scikit-learn
+scipy
 xgboost
 matplotlib
 seaborn
 flask
+fastapi
+uvicorn[standard]
 gunicorn
 openai
 python-dotenv
 jupyter
+nbformat
+nbconvert
 ipykernel

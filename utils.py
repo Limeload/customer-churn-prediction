@@ -8,9 +8,7 @@ FEATURE_COLUMNS = [
 ]
 
 # Model was trained on France=0, Germany=1, Spain=2.
-# Other countries map to the nearest regional encoding.
 GEOGRAPHY_MAP = {
-    # France cluster (Western Europe / default)
     'France': 0, 'Belgium': 0, 'Netherlands': 0, 'Luxembourg': 0,
     'Switzerland': 0, 'Ireland': 0, 'United Kingdom': 0, 'Portugal': 0,
     'United States': 0, 'Canada': 0, 'Australia': 0, 'New Zealand': 0,
@@ -24,7 +22,6 @@ GEOGRAPHY_MAP = {
     'Ivory Coast': 0, 'Cameroon': 0, 'Madagascar': 0, 'Mali': 0,
     'Burkina Faso': 0, 'Niger': 0, 'Chad': 0, 'Guinea': 0,
     'Lebanon': 0, 'Syria': 0, 'Jordan': 0,
-    # Germany cluster (Central / Northern / Eastern Europe)
     'Germany': 1, 'Austria': 1, 'Denmark': 1, 'Sweden': 1, 'Norway': 1,
     'Finland': 1, 'Iceland': 1, 'Poland': 1, 'Czech Republic': 1,
     'Slovakia': 1, 'Hungary': 1, 'Romania': 1, 'Bulgaria': 1,
@@ -37,7 +34,6 @@ GEOGRAPHY_MAP = {
     'UAE': 1, 'Kuwait': 1, 'Qatar': 1, 'Bahrain': 1, 'Oman': 1,
     'Yemen': 1, 'Pakistan': 1, 'Afghanistan': 1, 'Uzbekistan': 1,
     'China': 1, 'Mongolia': 1, 'Taiwan': 1,
-    # Spain cluster (Southern Europe / Africa / Asia)
     'Spain': 2, 'Italy': 2, 'Greece': 2, 'Cyprus': 2, 'Malta': 2,
     'India': 2, 'Bangladesh': 2, 'Sri Lanka': 2, 'Nepal': 2,
     'Myanmar': 2, 'Thailand': 2, 'Vietnam': 2, 'Cambodia': 2,
@@ -51,11 +47,13 @@ GEOGRAPHY_MAP = {
 GENDER_MAP = {'Female': 0, 'Male': 1}
 
 MODELS = {
-    'XGBoost': 'models/xgboost_model.pkl',
-    'Random Forest': 'models/random_forest_model.pkl',
-    'Decision Tree': 'models/decision_tree_model.pkl',
-    'SVM': 'models/svm_model.pkl',
-    'KNN': 'models/knn_model.pkl',
+    'XGBoost':           'models/bank/xgboost_model.pkl',
+    'Random Forest':     'models/bank/random_forest_model.pkl',
+    'Gradient Boosting': 'models/bank/gradient_boosting_model.pkl',
+    'Stacking':          'models/bank/stacking_model.pkl',
+    'Decision Tree':     'models/bank/decision_tree_model.pkl',
+    'SVM':               'models/bank/svm_model.pkl',
+    'KNN':               'models/bank/knn_model.pkl',
 }
 
 SCALED_MODELS = {'SVM', 'KNN'}
@@ -70,44 +68,40 @@ def load_models():
 
 
 def load_scaler():
-    with open('models/scaler.pkl', 'rb') as f:
+    with open('models/bank/scaler.pkl', 'rb') as f:
         return pickle.load(f)
 
 
 def preprocess(form_data):
     credit_score = float(form_data['credit_score'])
-    geography = GEOGRAPHY_MAP.get(form_data['geography'], 0)
-    gender = GENDER_MAP[form_data['gender']]
-    age = float(form_data['age'])
-    tenure = float(form_data['tenure'])
-    balance = float(form_data['balance'])
+    geography    = GEOGRAPHY_MAP.get(form_data['geography'], 0)
+    gender       = GENDER_MAP[form_data['gender']]
+    age          = float(form_data['age'])
+    tenure       = float(form_data['tenure'])
+    balance      = float(form_data['balance'])
     num_products = float(form_data['num_products'])
-    has_cr_card = float(form_data['has_cr_card'])
-    is_active = float(form_data['is_active'])
-    salary = float(form_data['salary'])
+    has_cr_card  = float(form_data['has_cr_card'])
+    is_active    = float(form_data['is_active'])
+    salary       = float(form_data['salary'])
 
     balance_salary_ratio = balance / (salary + 1)
-    tenure_age_ratio = tenure / (age + 1)
-    credit_per_age = credit_score / (age + 1)
+    tenure_age_ratio     = tenure  / (age + 1)
+    credit_per_age       = credit_score / (age + 1)
 
-    features = np.array([[
+    return np.array([[
         credit_score, geography, gender, age, tenure,
         balance, num_products, has_cr_card, is_active, salary,
         balance_salary_ratio, tenure_age_ratio, credit_per_age
     ]])
 
-    return features
-
 
 def predict_all(features, models, scaler):
     results = {}
     features_scaled = scaler.transform(features)
-
     for name, model in models.items():
         X = features_scaled if name in SCALED_MODELS else features
         prob = model.predict_proba(X)[0][1]
         results[name] = round(float(prob), 4)
-
-    avg_prob = round(np.mean(list(results.values())), 4)
+    avg_prob = round(float(np.mean(list(results.values()))), 4)
     results['Average'] = avg_prob
     return results
