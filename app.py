@@ -207,11 +207,18 @@ def serve_notebook(filename):
 
 @app.route("/train/run", methods=["POST"])
 def train_run():
-    return jsonify({
-        "success": False,
-        "error": "Notebook execution is only available on the Render deployment.",
-        "outputs": [],
-    }), 503
+    try:
+        if "notebook" not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+        nb_file = request.files["notebook"]
+        r = http.post(
+            f"{RENDER_API}/train/run",
+            files={"notebook": (nb_file.filename, nb_file.read(), "application/octet-stream")},
+            timeout=660,
+        )
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

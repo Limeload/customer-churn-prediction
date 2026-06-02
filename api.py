@@ -5,16 +5,26 @@ Endpoints:
   GET  /models           list available models
   POST /predict/bank     bank churn prediction
   POST /predict/telco    telco churn prediction
+  POST /train/run        execute an uploaded .ipynb notebook
   GET  /docs             auto-generated Swagger UI
 """
 import os
+import re
+import tempfile
 import warnings
 warnings.filterwarnings("ignore")
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Literal
 import numpy as np
+import nbformat
+from nbconvert.preprocessors import ExecutePreprocessor
+
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mK]')
+
+def _clean(text: str) -> str:
+    return _ANSI_RE.sub('', str(text))
 
 from utils import load_models, load_scaler, preprocess, predict_all
 from utils_telco import load_telco_models, load_telco_scaler, preprocess_telco, predict_telco
@@ -193,6 +203,57 @@ def predict_telco_endpoint(customer: TelcoCustomer):
         model_scores=predictions,
         dataset="telco",
     )
+
+
+@app.post("/train/run", tags=["Training"])
+async def train_run(notebook: UploadFile = File(...)):
+    """Execute an uploaded .ipynb notebook and return all cell outputs."""
+    if not notebook.filename.lower().endswith(".ipynb"):
+        raise HTTPException(status_code=400, detail="Only .ipynb files are accepted")
+
+    content = await notebook.read()
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = os.path.join(tmpdir, "nb.ipynb")
+        with open(path, "wb") as f:
+            f.write(content)
+        with open(path) as fh:
+            nb = nbformat.read(fh, as_version=4)
+
+        ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
+        success, exec_error = True, None
+        try:
+            ep.preprocess(nb, {"metadata": {"path": tmpdir}})
+        except Exception as exc:
+            success = False
+            exec_error = _clean(str(exc))
+
+        outputs = []
+        for cell in nb.cells:
+            if cell.cell_type != "code":
+                continue
+            for out in cell.get("outputs", []):
+                ot = out.get("output_type", "")
+                if ot == "stream":
+                    txt = _clean(out.get("text", ""))
+                    if txt.strip():
+                        outputs.append({"kind": "stream", "name": out.get("name", "stdout"), "text": txt})
+                elif ot in ("display_data", "execute_result"):
+                    d = out.get("data", {})
+                    if "image/png" in d:
+                        outputs.append({"kind": "image", "b64": d["image/png"]})
+                    elif "text/html" in d:
+                        outputs.append({"kind": "html", "html": d["text/html"]})
+                    elif "text/plain" in d:
+                        txt = _clean(d["text/plain"])
+                        if txt.strip():
+                            outputs.append({"kind": "text", "text": txt})
+                elif ot == "error":
+                    tb = _clean("\n".join(out.get("traceback",
+                        [f"{out.get('ename','Error')}: {out.get('evalue','')}"])))
+                    outputs.append({"kind": "error", "text": tb})
+
+    return {"success": success, "error": exec_error, "outputs": outputs}
 
 
 if __name__ == "__main__":
