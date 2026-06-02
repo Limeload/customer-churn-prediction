@@ -80,6 +80,11 @@ Overall average churn probability: {churn_probability:.1%}
 Provide your explanation and personalized retention email as JSON."""
 
 
+@app.errorhandler(Exception)
+def handle_error(e):
+    return jsonify({"error": str(e)}), getattr(e, "code", 500)
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -87,115 +92,121 @@ def index():
 
 @app.route("/predict", methods=["POST"])
 def predict():
-    form_data = request.form.to_dict()
-    llm = form_data.get("llm", "openai")
+    try:
+        form_data = request.form.to_dict()
+        llm = form_data.get("llm", "openai")
 
-    payload = {
-        "name":             form_data.get("name", "Valued Customer"),
-        "credit_score":     int(form_data.get("credit_score", 650)),
-        "geography":        form_data.get("geography", "France"),
-        "gender":           form_data.get("gender", "Female"),
-        "age":              int(form_data.get("age", 35)),
-        "tenure":           int(form_data.get("tenure", 5)),
-        "balance":          float(form_data.get("balance", 0)),
-        "num_products":     int(form_data.get("num_products", 1)),
-        "has_cr_card":      int(form_data.get("has_cr_card", 0)),
-        "is_active_member": int(form_data.get("is_active", 0)),
-        "estimated_salary": float(form_data.get("salary", 0)),
-    }
+        payload = {
+            "name":             form_data.get("name", "Valued Customer"),
+            "credit_score":     int(form_data.get("credit_score", 650)),
+            "geography":        form_data.get("geography", "France"),
+            "gender":           form_data.get("gender", "Female"),
+            "age":              int(form_data.get("age", 35)),
+            "tenure":           int(form_data.get("tenure", 5)),
+            "balance":          float(form_data.get("balance", 0)),
+            "num_products":     int(form_data.get("num_products", 1)),
+            "has_cr_card":      int(form_data.get("has_cr_card", 0)),
+            "is_active_member": int(form_data.get("is_active", 0)),
+            "estimated_salary": float(form_data.get("salary", 0)),
+        }
 
-    r = http.post(f"{RENDER_API}/predict/bank", json=payload, timeout=60)
-    r.raise_for_status()
-    result = r.json()
+        r = http.post(f"{RENDER_API}/predict/bank", json=payload, timeout=60)
+        r.raise_for_status()
+        result = r.json()
 
-    predictions = result["model_scores"]
-    avg_prob    = result["churn_probability"]
+        predictions = result["model_scores"]
+        avg_prob    = result["churn_probability"]
 
-    customer_data = {
-        "Name":               payload["name"],
-        "Age":                payload["age"],
-        "Geography":          payload["geography"],
-        "Gender":             payload["gender"],
-        "Credit Score":       payload["credit_score"],
-        "Tenure (years)":     payload["tenure"],
-        "Balance":            f"${payload['balance']:,.2f}",
-        "Number of Products": payload["num_products"],
-        "Has Credit Card":    "Yes" if payload["has_cr_card"] == 1 else "No",
-        "Is Active Member":   "Yes" if payload["is_active_member"] == 1 else "No",
-        "Estimated Salary":   f"${payload['estimated_salary']:,.2f}",
-    }
+        customer_data = {
+            "Name":               payload["name"],
+            "Age":                payload["age"],
+            "Geography":          payload["geography"],
+            "Gender":             payload["gender"],
+            "Credit Score":       payload["credit_score"],
+            "Tenure (years)":     payload["tenure"],
+            "Balance":            f"${payload['balance']:,.2f}",
+            "Number of Products": payload["num_products"],
+            "Has Credit Card":    "Yes" if payload["has_cr_card"] == 1 else "No",
+            "Is Active Member":   "Yes" if payload["is_active_member"] == 1 else "No",
+            "Estimated Salary":   f"${payload['estimated_salary']:,.2f}",
+        }
 
-    user_message = build_user_message(customer_data, predictions, avg_prob)
-    llm_result   = get_llm_response(user_message, llm)
+        user_message = build_user_message(customer_data, predictions, avg_prob)
+        llm_result   = get_llm_response(user_message, llm)
 
-    return jsonify({
-        "churn_probability": avg_prob,
-        "model_scores":      predictions,
-        "explanation":       llm_result.get("explanation", ""),
-        "email":             llm_result.get("email", ""),
-        "llm_label":         LLM_CONFIGS.get(llm, LLM_CONFIGS["openai"])["label"],
-    })
+        return jsonify({
+            "churn_probability": avg_prob,
+            "model_scores":      predictions,
+            "explanation":       llm_result.get("explanation", ""),
+            "email":             llm_result.get("email", ""),
+            "llm_label":         LLM_CONFIGS.get(llm, LLM_CONFIGS["openai"])["label"],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/predict-telco", methods=["POST"])
 def predict_telco_route():
-    form_data = request.form.to_dict()
-    llm = form_data.get("llm", "openai")
+    try:
+        form_data = request.form.to_dict()
+        llm = form_data.get("llm", "openai")
 
-    payload = {
-        "name":             form_data.get("name", "Valued Customer"),
-        "gender":           form_data.get("gender", "Male"),
-        "senior_citizen":   int(form_data.get("senior_citizen", 0)),
-        "partner":          form_data.get("partner", "No"),
-        "dependents":       form_data.get("dependents", "No"),
-        "tenure":           int(form_data.get("tenure", 0)),
-        "phone_service":    form_data.get("phone_service", "Yes"),
-        "multiple_lines":   form_data.get("multiple_lines", "No"),
-        "internet_service": form_data.get("internet_service", "DSL"),
-        "online_security":  form_data.get("online_security", "No"),
-        "online_backup":    form_data.get("online_backup", "No"),
-        "device_protection":form_data.get("device_protection", "No"),
-        "tech_support":     form_data.get("tech_support", "No"),
-        "streaming_tv":     form_data.get("streaming_tv", "No"),
-        "streaming_movies": form_data.get("streaming_movies", "No"),
-        "contract":         form_data.get("contract", "Month-to-month"),
-        "paperless_billing":form_data.get("paperless_billing", "Yes"),
-        "payment_method":   form_data.get("payment_method", "Electronic check"),
-        "monthly_charges":  float(form_data.get("monthly_charges", 0)),
-        "total_charges":    float(form_data.get("total_charges", 0)),
-    }
+        payload = {
+            "name":             form_data.get("name", "Valued Customer"),
+            "gender":           form_data.get("gender", "Male"),
+            "senior_citizen":   int(form_data.get("senior_citizen", 0)),
+            "partner":          form_data.get("partner", "No"),
+            "dependents":       form_data.get("dependents", "No"),
+            "tenure":           int(form_data.get("tenure", 0)),
+            "phone_service":    form_data.get("phone_service", "Yes"),
+            "multiple_lines":   form_data.get("multiple_lines", "No"),
+            "internet_service": form_data.get("internet_service", "DSL"),
+            "online_security":  form_data.get("online_security", "No"),
+            "online_backup":    form_data.get("online_backup", "No"),
+            "device_protection":form_data.get("device_protection", "No"),
+            "tech_support":     form_data.get("tech_support", "No"),
+            "streaming_tv":     form_data.get("streaming_tv", "No"),
+            "streaming_movies": form_data.get("streaming_movies", "No"),
+            "contract":         form_data.get("contract", "Month-to-month"),
+            "paperless_billing":form_data.get("paperless_billing", "Yes"),
+            "payment_method":   form_data.get("payment_method", "Electronic check"),
+            "monthly_charges":  float(form_data.get("monthly_charges", 0)),
+            "total_charges":    float(form_data.get("total_charges", 0)),
+        }
 
-    r = http.post(f"{RENDER_API}/predict/telco", json=payload, timeout=60)
-    r.raise_for_status()
-    result = r.json()
+        r = http.post(f"{RENDER_API}/predict/telco", json=payload, timeout=60)
+        r.raise_for_status()
+        result = r.json()
 
-    predictions = result["model_scores"]
-    avg_prob    = result["churn_probability"]
+        predictions = result["model_scores"]
+        avg_prob    = result["churn_probability"]
 
-    customer_data = {
-        "Name":              payload["name"],
-        "Gender":            payload["gender"],
-        "Senior Citizen":    "Yes" if payload["senior_citizen"] == 1 else "No",
-        "Tenure (months)":   payload["tenure"],
-        "Contract":          payload["contract"],
-        "Internet Service":  payload["internet_service"],
-        "Monthly Charges":   f"${payload['monthly_charges']:,.2f}",
-        "Total Charges":     f"${payload['total_charges']:,.2f}",
-        "Payment Method":    payload["payment_method"],
-        "Paperless Billing": payload["paperless_billing"],
-        "Tech Support":      payload["tech_support"],
-    }
+        customer_data = {
+            "Name":              payload["name"],
+            "Gender":            payload["gender"],
+            "Senior Citizen":    "Yes" if payload["senior_citizen"] == 1 else "No",
+            "Tenure (months)":   payload["tenure"],
+            "Contract":          payload["contract"],
+            "Internet Service":  payload["internet_service"],
+            "Monthly Charges":   f"${payload['monthly_charges']:,.2f}",
+            "Total Charges":     f"${payload['total_charges']:,.2f}",
+            "Payment Method":    payload["payment_method"],
+            "Paperless Billing": payload["paperless_billing"],
+            "Tech Support":      payload["tech_support"],
+        }
 
-    user_message = build_user_message(customer_data, predictions, avg_prob)
-    llm_result   = get_llm_response(user_message, llm)
+        user_message = build_user_message(customer_data, predictions, avg_prob)
+        llm_result   = get_llm_response(user_message, llm)
 
-    return jsonify({
-        "churn_probability": avg_prob,
-        "model_scores":      predictions,
-        "explanation":       llm_result.get("explanation", ""),
-        "email":             llm_result.get("email", ""),
-        "llm_label":         LLM_CONFIGS.get(llm, LLM_CONFIGS["openai"])["label"],
-    })
+        return jsonify({
+            "churn_probability": avg_prob,
+            "model_scores":      predictions,
+            "explanation":       llm_result.get("explanation", ""),
+            "email":             llm_result.get("email", ""),
+            "llm_label":         LLM_CONFIGS.get(llm, LLM_CONFIGS["openai"])["label"],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/train")
