@@ -1,6 +1,9 @@
+import io
 import os
 import json
 import requests as http
+import nbformat
+from nbconvert.preprocessors import ExecutePreprocessor, CellExecutionError
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -259,11 +262,13 @@ def train_run():
         if "notebook" not in request.files:
             return jsonify({"error": "No file provided"}), 400
         nb_file = request.files["notebook"]
-        r = http.post(
-            f"{RENDER_API}/train/run",
-            files={"notebook": (nb_file.filename, nb_file.read(), "application/octet-stream")},
-            timeout=660,
-        )
-        return jsonify(r.json()), r.status_code
+        nb = nbformat.read(io.TextIOWrapper(nb_file.stream, encoding="utf-8"), as_version=4)
+        ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
+        try:
+            ep.preprocess(nb, {"metadata": {"path": _root}})
+        except CellExecutionError:
+            pass  # return cells even if a cell errored
+        nb_json = json.loads(nbformat.writes(nb))
+        return jsonify({"cells": nb_json["cells"]}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
