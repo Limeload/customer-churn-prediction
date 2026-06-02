@@ -7,3 +7,5 @@ services:
     envVars:
       - key: PORT
         value: 8000
+      - key: HF_REPO_ID
+        value: shraddharaom/churnguard-models

@@ -1,5 +1,19 @@
+import os
 import pickle
 import numpy as np
+from huggingface_hub import hf_hub_download
+
+HF_REPO_ID = os.getenv("HF_REPO_ID", "shraddharaom/churnguard-models")
+
+
+def _load_pkl(local_path: str) -> object:
+    if os.path.exists(local_path):
+        with open(local_path, "rb") as f:
+            return pickle.load(f)
+    hf_file = local_path.removeprefix("models/")
+    path = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
+    with open(path, "rb") as f:
+        return pickle.load(f)
 
 FEATURE_COLUMNS = [
     'CreditScore', 'Geography', 'Gender', 'Age', 'Tenure',
@@ -60,16 +74,11 @@ SCALED_MODELS = {'SVM', 'KNN'}
 
 
 def load_models():
-    loaded = {}
-    for name, path in MODELS.items():
-        with open(path, 'rb') as f:
-            loaded[name] = pickle.load(f)
-    return loaded
+    return {name: _load_pkl(path) for name, path in MODELS.items()}
 
 
 def load_scaler():
-    with open('models/bank/scaler.pkl', 'rb') as f:
-        return pickle.load(f)
+    return _load_pkl("models/bank/scaler.pkl")
 
 
 def preprocess(form_data):

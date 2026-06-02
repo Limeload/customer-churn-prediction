@@ -37,21 +37,42 @@ python training/train_telco.py  # → models/telco/
 
 ## REST API
 
-A FastAPI service is also available:
+A FastAPI service is also available locally:
 
 ```bash
 uvicorn api:app --reload
 # docs at http://127.0.0.1:8000/docs
 ```
 
-## Deployment
+Endpoints:
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Status + model count |
+| GET | `/models` | List loaded models |
+| POST | `/predict/bank` | Bank churn prediction |
+| POST | `/predict/telco` | Telco churn prediction |
+
+## Cloud Deployment
+
+Models are hosted on [Hugging Face Hub](https://huggingface.co/shraddharaom/churnguard-models) and downloaded automatically on first startup. The API is deployed on [Render](https://render.com).
+
+**1. Upload models to Hugging Face Hub** (one-time, after training)
+
+- Go to [huggingface.co/new](https://huggingface.co/new) and create a model repo named `churnguard-models`
+- In the repo, create two folders: `bank/` and `telco/`
+- Upload all `.pkl` files from `models/bank/` into `bank/` and from `models/telco/` into `telco/`
+
+**2. Deploy API to Render**
+
+Connect the repo to Render — `render.yaml` configures everything automatically (Docker runtime, health check, `HF_REPO_ID` env var). On first boot the API pulls all `.pkl` files from HF Hub and caches them.
 
 ```bash
-gunicorn app:app          # Flask (Heroku/Railway via Procfile)
-docker build -t churnguard . && docker run -p 8000:8000 churnguard  # FastAPI
+gunicorn app:app          # Flask UI (Heroku/Railway via Procfile)
+docker build -t churnguard . && docker run -p 8000:8000 churnguard  # FastAPI locally
 ```
 
-`render.yaml` is included for one-click Render deployment.
+The deployed API has CORS open to all origins, so any web app can call it directly.
 
 ## Stack
 
