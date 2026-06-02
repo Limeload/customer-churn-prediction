@@ -286,107 +286,63 @@
     document.getElementById('output-panel').style.display = 'block';
 
     const statEl = document.getElementById('stat-status');
-    document.getElementById('stat-status-val').textContent = status;
-    statEl.className = 'out-stat ' + (status >= 200 && status < 300 ? 'ok' : 'err');
-    document.getElementById('stat-time-val').textContent   = elapsed;
+    const ok = data.success !== false;
+    document.getElementById('stat-status-val').textContent = ok ? 'OK' : 'Error';
+    statEl.className = 'out-stat ' + (ok ? 'ok' : 'err');
+    document.getElementById('stat-time-val').textContent  = elapsed;
+
+    const outputs = data.outputs || [];
+    document.getElementById('stat-cells-val').textContent = outputs.length;
 
     const wrap = document.getElementById('cells-wrap');
     wrap.innerHTML = '';
 
-    // Handle nbformat-style response: { cells: [...] }
-    const cells = data.cells || data.notebook?.cells || null;
+    if (data.error) {
+      const errEl = document.createElement('div');
+      errEl.className = 'cell-output has-error';
+      errEl.style.cssText = 'margin-bottom:2px;border:1px solid var(--border);';
+      errEl.textContent = data.error;
+      wrap.appendChild(errEl);
+    }
 
-    if (cells && Array.isArray(cells)) {
-      document.getElementById('stat-cells-val').textContent = cells.length;
-      cells.forEach((cell, i) => renderCell(wrap, cell, i + 1));
-    } else {
-      // Fallback: show raw JSON
-      document.getElementById('stat-cells-val').textContent = '—';
+    outputs.forEach((out, i) => {
       const block = document.createElement('div');
-      block.className = 'json-wrap';
-      block.innerHTML = `
-        <div class="json-hdr">
-          <span class="card-lbl">Response Body</span>
-          <button class="copy-btn" id="copy-btn" type="button">Copy JSON</button>
-        </div>
-        <pre class="json-pre">${esc(JSON.stringify(data, null, 2))}</pre>
-      `;
-      wrap.appendChild(block);
-      block.querySelector('#copy-btn').addEventListener('click', () => {
-        navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
-          const b = block.querySelector('#copy-btn');
-          b.textContent = 'Copied'; b.classList.add('ok');
-          setTimeout(() => { b.textContent = 'Copy JSON'; b.classList.remove('ok'); }, 2000);
-        });
-      });
-    }
-  }
+      block.className = 'cell-block';
 
-  function renderCell(wrap, cell, idx) {
-    const cellType = cell.cell_type || 'code';
-    const source   = Array.isArray(cell.source) ? cell.source.join('') : (cell.source || '');
-    const outputs  = cell.outputs || [];
+      const hdr = document.createElement('div');
+      hdr.className = 'cell-hdr';
+      const kindLabel = out.kind === 'stream' ? (out.name || 'stdout') : out.kind;
+      const kindClass = out.kind === 'error' ? 'error' : 'code';
+      hdr.innerHTML = `<span class="cell-num">Output ${i + 1}</span><span class="cell-type ${kindClass}">${esc(kindLabel)}</span>`;
+      block.appendChild(hdr);
 
-    const block = document.createElement('div');
-    block.className = 'cell-block';
+      const body = document.createElement('div');
 
-    // Header
-    const hdr = document.createElement('div');
-    hdr.className = 'cell-hdr';
-    hdr.innerHTML = `
-      <span class="cell-num">Cell ${idx}</span>
-      <span class="cell-type ${cellType}">${cellType}</span>
-    `;
-    block.appendChild(hdr);
-
-    // Source
-    if (source.trim()) {
-      const src = document.createElement('div');
-      src.className = 'cell-source';
-      src.textContent = source;
-      block.appendChild(src);
-    }
-
-    // Outputs
-    outputs.forEach(out => {
-      const outEl = document.createElement('div');
-      const outType = out.output_type || '';
-      const isError = outType === 'error';
-      outEl.className = 'cell-output' + (isError ? ' has-error' : '');
-
-      if (isError) {
-        const tb = Array.isArray(out.traceback) ? out.traceback.join('\n') : '';
-        outEl.textContent = `${out.ename}: ${out.evalue}\n\n${stripAnsi(tb)}`;
-      } else if (out['text/html']) {
-        outEl.innerHTML = sanitizeHtml(asString(out['text/html']));
-      } else if (out['image/png']) {
+      if (out.kind === 'image') {
+        body.className = 'cell-output';
         const img = document.createElement('img');
-        img.src = 'data:image/png;base64,' + asString(out['image/png']).trim();
-        outEl.appendChild(img);
+        img.src = 'data:image/png;base64,' + out.b64.trim();
+        body.appendChild(img);
+      } else if (out.kind === 'html') {
+        body.className = 'cell-output';
+        const html = Array.isArray(out.html) ? out.html.join('') : out.html;
+        body.innerHTML = html.replace(/<script[\s\S]*?<\/script>/gi, '');
       } else {
-        const text = asString(out.text || out['text/plain'] || out.data?.['text/plain'] || '');
-        if (text) outEl.textContent = text;
+        body.className = 'cell-output' + (out.kind === 'error' ? ' has-error' : '');
+        body.textContent = Array.isArray(out.text) ? out.text.join('') : (out.text || '');
       }
 
-      if (outEl.textContent.trim() || outEl.querySelector('img')) {
-        block.appendChild(outEl);
-      }
+      block.appendChild(body);
+      wrap.appendChild(block);
     });
 
-    wrap.appendChild(block);
-  }
-
-  function asString(v) {
-    return Array.isArray(v) ? v.join('') : (v || '');
-  }
-
-  function stripAnsi(s) {
-    return s.replace(/\x1b\[[0-9;]*m/g, '');
-  }
-
-  function sanitizeHtml(html) {
-    // Allow only safe display tags; strip scripts
-    return html.replace(/<script[\s\S]*?<\/script>/gi, '');
+    if (outputs.length === 0 && !data.error) {
+      const empty = document.createElement('div');
+      empty.className = 'cell-output';
+      empty.style.cssText = 'border:1px solid var(--border);color:var(--muted);font-style:italic;';
+      empty.textContent = 'Notebook executed with no output.';
+      wrap.appendChild(empty);
+    }
   }
 
   function setLoading(on) {
@@ -400,8 +356,6 @@
     document.getElementById('error-box').style.display = 'block';
   }
 
-  function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 {% endblock %}

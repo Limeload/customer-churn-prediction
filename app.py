@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import json
 import requests as http
 import nbformat
@@ -7,6 +8,9 @@ from nbconvert.preprocessors import ExecutePreprocessor, CellExecutionError
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
 from openai import OpenAI
+
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mK]')
+def _clean(text): return _ANSI_RE.sub('', str(text))
 
 load_dotenv()
 
@@ -248,12 +252,37 @@ def train_run():
         nb_file = request.files["notebook"]
         nb = nbformat.reads(nb_file.read().decode("utf-8"), as_version=4)
         ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
+        success, exec_error = True, None
         try:
             ep.preprocess(nb, {"metadata": {"path": app.root_path}})
-        except CellExecutionError:
-            pass  # return cells even if a cell errored
-        nb_json = json.loads(nbformat.writes(nb))
-        return jsonify({"cells": nb_json["cells"]}), 200
+        except Exception as exc:
+            success = False
+            exec_error = _clean(str(exc))
+        outputs = []
+        for cell in nb.cells:
+            if cell.cell_type != "code":
+                continue
+            for out in cell.get("outputs", []):
+                ot = out.get("output_type", "")
+                if ot == "stream":
+                    txt = _clean(out.get("text", ""))
+                    if txt.strip():
+                        outputs.append({"kind": "stream", "name": out.get("name", "stdout"), "text": txt})
+                elif ot in ("display_data", "execute_result"):
+                    d = out.get("data", {})
+                    if "image/png" in d:
+                        outputs.append({"kind": "image", "b64": d["image/png"]})
+                    elif "text/html" in d:
+                        outputs.append({"kind": "html", "html": d["text/html"]})
+                    elif "text/plain" in d:
+                        txt = _clean(d["text/plain"])
+                        if txt.strip():
+                            outputs.append({"kind": "text", "text": txt})
+                elif ot == "error":
+                    tb = _clean("\n".join(out.get("traceback",
+                        [f"{out.get('ename','Error')}: {out.get('evalue','')}"])))
+                    outputs.append({"kind": "error", "text": tb})
+        return jsonify({"success": success, "error": exec_error, "outputs": outputs}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
