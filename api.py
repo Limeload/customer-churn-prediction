@@ -38,7 +38,7 @@ app = FastAPI(
         "All endpoints return a churn probability, per-model scores, and a risk level."
     ),
     version="1.0.0",
-    contact={"name": "ChurnGuard", "url": "https://github.com/shraddharaom/customer-churn-prediction"},
+    contact={"name": "ChurnGuard", "url": "https://github.com/Limeload/customer-churn-prediction"},
 )
 
 app.add_middleware(
