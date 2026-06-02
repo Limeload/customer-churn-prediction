@@ -209,6 +209,38 @@ def predict_telco_route():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/health")
+def api_health():
+    try:
+        r = http.get(f"{RENDER_API}/health", timeout=30)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+@app.route("/api/models")
+def api_models():
+    try:
+        r = http.get(f"{RENDER_API}/models", timeout=30)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+@app.route("/api/predict/bank", methods=["POST"])
+def api_predict_bank():
+    try:
+        r = http.post(f"{RENDER_API}/predict/bank", json=request.json, timeout=60)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+@app.route("/api/predict/telco", methods=["POST"])
+def api_predict_telco():
+    try:
+        r = http.post(f"{RENDER_API}/predict/telco", json=request.json, timeout=60)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
 @app.route("/train")
 def train_page():
     return render_template("train.html")

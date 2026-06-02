@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}ChurnGuard — API Explorer{% endblock %}
+{% block title %}ChurnGuard — Model API Testing{% endblock %}
 {% block nav_train %}active{% endblock %}
 
 {% block styles %}
@@ -81,12 +81,12 @@
 {% endblock %}
 
 {% block hero %}
-  <p class="hero-eye">API Explorer</p>
-  <h1 class="hero-title">Test the Render API.</h1>
-  <p class="hero-sub">Live endpoint testing for the ChurnGuard Render deployment — health checks, model listings, and churn predictions.</p>
+  <p class="hero-eye">Model API Testing</p>
+  <h1 class="hero-title">Test the Prediction Models.</h1>
+  <p class="hero-sub">Run live requests against the deployed churn models — inspect raw predictions, response times, and per-model scores.</p>
 {% endblock %}
 
-{% block footer_stack %}FastAPI &middot; scikit-learn &middot; XGBoost &middot; Render{% endblock %}
+{% block footer_stack %}FastAPI &middot; scikit-learn &middot; XGBoost &middot; 7 bank models &middot; 5 telco models{% endblock %}
 
 {% block content %}
 <div class="page">
@@ -321,16 +321,14 @@
   .copy-btn.ok { color:#2d7a3c; border-color:#a8d5b0; background:#f0faf2; }
 </style>
 <script>
-  const RENDER = 'https://customer-churn-prediction-02k2.onrender.com';
-
   let activeEp = 'health';
   let rawJson  = null;
 
   const EP_META = {
-    health: { method:'GET',  path:'/health' },
-    models: { method:'GET',  path:'/models' },
-    bank:   { method:'POST', path:'/predict/bank' },
-    telco:  { method:'POST', path:'/predict/telco' },
+    health: { method:'GET',  path:'/api/health' },
+    models: { method:'GET',  path:'/api/models' },
+    bank:   { method:'POST', path:'/api/predict/bank' },
+    telco:  { method:'POST', path:'/api/predict/telco' },
   };
 
   // Tab switching
@@ -353,10 +351,10 @@
     try {
       let resp;
       if (meta.method === 'GET') {
-        resp = await fetch(`${RENDER}${meta.path}`);
+        resp = await fetch(meta.path);
       } else {
         const body = activeEp === 'bank' ? bankPayload() : telcoPayload();
-        resp = await fetch(`${RENDER}${meta.path}`, {
+        resp = await fetch(meta.path, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
