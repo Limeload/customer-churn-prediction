@@ -74,6 +74,22 @@ docker build -t churnguard . && docker run -p 8000:8000 churnguard  # FastAPI lo
 
 The deployed API has CORS open to all origins, so any web app can call it directly.
 
+**3. Deploy Flask UI to Vercel**
+
+```bash
+vercel --prod
+```
+
+Add these environment variables in the Vercel dashboard → Settings → Environment Variables:
+
+```
+OPENAI_API_KEY   = sk-...
+GROQ_API_KEY     = gsk_...
+RENDER_API_URL   = https://customer-churn-prediction-02k2.onrender.com
+```
+
+The Flask UI has no ML dependencies — it proxies all predictions to the Render API and only calls OpenAI/Groq for the explanation and email.
+
 ## Stack
 
 ML: scikit-learn, XGBoost · Web: Flask, FastAPI · UI: Tailwind CSS, Chart.js · AI: OpenAI GPT-4o, Groq Llama 3.3

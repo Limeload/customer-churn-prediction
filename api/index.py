@@ -7,7 +7,12 @@ from openai import OpenAI
 
 load_dotenv()
 
-app = Flask(__name__)
+_root = os.path.dirname(os.path.dirname(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(_root, "templates"),
+)
 
 RENDER_API = os.getenv("RENDER_API_URL", "https://customer-churn-prediction-02k2.onrender.com")
 
@@ -215,7 +220,7 @@ def train_page():
 @app.route("/notebooks/<path:filename>")
 def serve_notebook(filename):
     return send_from_directory(
-        os.path.join(app.root_path, "notebooks"), filename, as_attachment=True
+        os.path.join(_root, "notebooks"), filename, as_attachment=True
     )
 
 
@@ -226,7 +231,3 @@ def train_run():
         "error": "Notebook execution is only available on the Render deployment.",
         "outputs": [],
     }), 503
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
