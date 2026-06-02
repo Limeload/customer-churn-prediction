@@ -16,29 +16,15 @@ app = Flask(
 
 RENDER_API = os.getenv("RENDER_API_URL", "https://customer-churn-prediction-02k2.onrender.com")
 
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-groq_client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1",
-)
-
 LLM_CONFIGS = {
-    "openai": {
-        "client": openai_client,
-        "model": "gpt-4o",
-        "label": "OpenAI GPT-4o",
-        "temperature": 0.4,
-        "max_tokens": 1024,
-    },
-    "groq": {
-        "client": groq_client,
-        "model": "llama-3.3-70b-versatile",
-        "label": "Groq Llama 3.3 70B",
-        "temperature": 0.5,
-        "max_tokens": 1024,
-    },
+    "openai": {"model": "gpt-4o",                  "label": "OpenAI GPT-4o",        "temperature": 0.4, "max_tokens": 1024},
+    "groq":   {"model": "llama-3.3-70b-versatile", "label": "Groq Llama 3.3 70B",   "temperature": 0.5, "max_tokens": 1024},
 }
+
+def _llm_client(llm: str) -> OpenAI:
+    if llm == "groq":
+        return OpenAI(api_key=os.getenv("GROQ_API_KEY"), base_url="https://api.groq.com/openai/v1")
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 SYSTEM_PROMPT = """You are a customer retention specialist at a bank. You receive structured data
 about a customer and the churn probability predicted by multiple ML models.
@@ -70,7 +56,7 @@ def parse_llm_json(text: str) -> dict:
 
 def get_llm_response(user_message: str, llm: str) -> dict:
     cfg = LLM_CONFIGS.get(llm, LLM_CONFIGS["openai"])
-    completion = cfg["client"].chat.completions.create(
+    completion = _llm_client(llm).chat.completions.create(
         model=cfg["model"],
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
