@@ -246,7 +246,7 @@ def train_run():
         if "notebook" not in request.files:
             return jsonify({"error": "No file provided"}), 400
         nb_file = request.files["notebook"]
-        nb = nbformat.read(io.TextIOWrapper(nb_file.stream, encoding="utf-8"), as_version=4)
+        nb = nbformat.reads(nb_file.read().decode("utf-8"), as_version=4)
         ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
         try:
             ep.preprocess(nb, {"metadata": {"path": app.root_path}})

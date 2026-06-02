@@ -261,8 +261,14 @@
     try {
       const resp = await fetch('/train/run', { method: 'POST', body: fd });
       const elapsed = Date.now() - t0;
-      const data = await resp.json();
-
+      const text = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        showError(`Server error: ${text.slice(0, 200)}`);
+        return;
+      }
       if (!resp.ok) {
         showError(data.error || `Server returned ${resp.status}`);
         return;
