@@ -1,111 +1,115 @@
 {% extends "base.html" %}
 
-{% block title %}ChurnGuard — Train Your Own Model{% endblock %}
+{% block title %}ChurnGuard — Run a Notebook{% endblock %}
 {% block nav_train %}active{% endblock %}
 
 {% block styles %}
-    :root { --left-w: 360px; }
+    :root { --left-w: 340px; }
 
-    .drop-zone {
-      border:2px dashed var(--border); padding:36px 20px;
-      display:flex; flex-direction:column; align-items:center; gap:14px;
-      text-align:center; cursor:pointer; transition:border-color .2s,background .2s;
+    /* ── Upload card ── */
+    .file-row { display:flex; align-items:center; gap:10px; }
+    .file-label {
+      flex:1; border:1px solid var(--border); padding:8px 12px;
+      font-size:13px; font-weight:300; color:var(--muted);
+      background:#fff; cursor:pointer; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; transition:border-color .15s;
     }
-    .drop-zone:hover,.drop-zone.over { border-color:var(--salmon); background:var(--salmon10); }
-    .drop-icon { width:44px; height:44px; border-radius:50%; background:var(--salmon10); display:flex; align-items:center; justify-content:center; }
-    .drop-icon svg { width:20px; height:20px; stroke:var(--salmon); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-    .drop-title { font-size:13px; font-weight:700; color:var(--ink); }
-    .drop-sub { font-size:12px; font-weight:300; color:var(--muted); line-height:1.5; }
-    #file-name {
-      font-size:11px; font-weight:600; letter-spacing:.04em; color:var(--salmon);
-      padding:5px 12px; background:var(--salmon10); border:1px solid rgba(255,115,96,.25);
-      display:none; word-break:break-all; text-align:center;
+    .file-label.chosen { color:var(--ink); border-color:var(--salmon); }
+    .file-btn {
+      font-family:inherit; font-size:10px; font-weight:700; letter-spacing:.1em;
+      text-transform:uppercase; background:var(--smoke); border:1px solid var(--border);
+      padding:9px 14px; cursor:pointer; color:var(--gray); white-space:nowrap;
+      transition:.15s;
     }
-    .tip-list { list-style:none; display:flex; flex-direction:column; gap:10px; }
-    .tip-list li { display:flex; gap:10px; font-size:13px; font-weight:300; color:var(--gray); line-height:1.5; }
-    .tip-dot { width:5px; height:5px; border-radius:50%; background:var(--salmon); flex-shrink:0; margin-top:7px; }
+    .file-btn:hover { border-color:var(--salmon); color:var(--ink); }
 
+    /* ── Notebook cells ── */
     #output-panel { display:none; }
-    .out-eye { font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--salmon); margin-bottom:12px; }
-    .summary-bar { display:flex; gap:2px; margin-bottom:2px; }
-    .summary-stat { flex:1; background:#fff; border:1px solid var(--border); padding:14px 18px; }
-    .summary-stat-val { font-size:1.4rem; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
-    .summary-stat-lbl { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
-    .summary-stat.ok .summary-stat-val { color:#2d7a3c; }
-    .summary-stat.err-stat .summary-stat-val { color:#c0392b; }
+    .nb-eye { font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--salmon); margin-bottom:10px; }
 
-    .terminal { background:#1c1c1e; border:1px solid #333; overflow:hidden; }
-    .terminal-hdr { padding:8px 16px; background:#2a2a2c; border-bottom:1px solid #333; display:flex; align-items:center; gap:8px; }
-    .terminal-dot { width:10px; height:10px; border-radius:50%; }
-    .terminal-title { font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:#888; margin-left:4px; }
-    .terminal-body { max-height:600px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:#333 transparent; }
-    .terminal-body::-webkit-scrollbar { width:4px; }
-    .terminal-body::-webkit-scrollbar-thumb { background:#444; border-radius:2px; }
-    .out-cell { border-bottom:1px solid #2a2a2c; }
-    .out-cell:last-child { border-bottom:none; }
-    .out-stream { padding:12px 18px; font-family:'SF Mono','Fira Code',monospace; font-size:12.5px; line-height:1.65; white-space:pre-wrap; word-break:break-word; color:#d4d4d4; }
-    .out-stream.stderr { color:#ff9f7f; }
-    .out-text  { padding:12px 18px; font-family:'SF Mono','Fira Code',monospace; font-size:12.5px; line-height:1.65; white-space:pre-wrap; word-break:break-word; color:#b8d4ff; }
-    .out-error { padding:12px 18px; font-family:'SF Mono','Fira Code',monospace; font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word; color:#ff6b6b; background:#2d1a1a; }
-    .out-image { padding:14px 18px; }
-    .out-image img { max-width:100%; height:auto; display:block; }
-    .out-html { padding:14px 18px; background:#fff; overflow-x:auto; }
-    .out-html table { border-collapse:collapse; font-size:12px; width:100%; }
-    .out-html th { background:var(--seashell); border:1px solid var(--border); padding:6px 10px; font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--gray); text-align:left; }
-    .out-html td { border:1px solid var(--border); padding:5px 10px; color:var(--charcoal); }
-    .out-html tr:nth-child(even) td { background:#faf8f6; }
+    .nb-stats { display:flex; gap:2px; margin-bottom:2px; }
+    .nb-stat { flex:1; background:#fff; border:1px solid var(--border); padding:12px 16px; }
+    .nb-stat-val { font-size:1.3rem; font-weight:700; letter-spacing:-.02em; color:var(--ink); }
+    .nb-stat-lbl { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+    .nb-stat.ok  .nb-stat-val { color:#2d7a3c; }
+    .nb-stat.err .nb-stat-val { color:#c0392b; }
 
-    .spinner { display:none; width:18px; height:18px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; margin:0 auto; }
+    .nb-cells { display:flex; flex-direction:column; gap:2px; margin-top:2px; }
+
+    .nb-cell { background:#fff; border:1px solid var(--border); overflow:hidden; }
+    .nb-cell-hdr {
+      padding:5px 14px; background:var(--smoke); border-bottom:1px solid var(--soft);
+      display:flex; align-items:center; gap:8px;
+    }
+    .nb-badge {
+      font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+      padding:2px 7px; border:1px solid;
+    }
+    .nb-badge.stdout  { color:#2d7a3c; border-color:#a8d5b0; background:#f0faf2; }
+    .nb-badge.stderr  { color:#9a6300; border-color:#f0d48a; background:#fdf8ed; }
+    .nb-badge.output  { color:#1a5fa8; border-color:#a8c8f0; background:#f0f5ff; }
+    .nb-badge.error   { color:#c0392b; border-color:#f4b8b2; background:#fff8f7; }
+    .nb-badge.figure  { color:#6b3fa0; border-color:#d0b8f0; background:#f8f0ff; }
+    .nb-badge.table   { color:#2d7a3c; border-color:#a8d5b0; background:#f0faf2; }
+
+    .nb-pre {
+      padding:12px 16px; font-family:'SF Mono','Fira Code',monospace;
+      font-size:12.5px; line-height:1.65; white-space:pre-wrap;
+      word-break:break-word; color:var(--charcoal); margin:0;
+    }
+    .nb-pre.err { color:#c0392b; background:#fff8f7; }
+
+    .nb-img { padding:14px 16px; }
+    .nb-img img { max-width:100%; height:auto; display:block; border:1px solid var(--soft); }
+
+    .nb-tbl { padding:0; overflow-x:auto; }
+    .nb-tbl table { border-collapse:collapse; font-size:12px; width:100%; }
+    .nb-tbl th { background:var(--seashell); border:1px solid var(--border); padding:6px 10px; font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--gray); text-align:left; }
+    .nb-tbl td { border:1px solid var(--border); padding:5px 10px; color:var(--charcoal); }
+    .nb-tbl tr:nth-child(even) td { background:#faf8f6; }
+
+    /* ── Spinner ── */
+    .spinner { display:none; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    .btn-inner { display:flex; align-items:center; justify-content:center; gap:8px; }
 {% endblock %}
 
 {% block hero %}
   <p class="hero-eye">Custom Training</p>
-  <h1 class="hero-title">Train Your Own Model.</h1>
-  <p class="hero-sub">Upload a Jupyter notebook — ChurnGuard executes it and streams the outputs, charts, and metrics here.</p>
+  <h1 class="hero-title">Run a Notebook.</h1>
+  <p class="hero-sub">Upload a .ipynb file — ChurnGuard executes it on the cloud and renders all outputs here.</p>
 {% endblock %}
 
-{% block footer_stack %}Flask &middot; nbformat &middot; nbconvert &middot; scikit-learn &middot; XGBoost{% endblock %}
+{% block footer_stack %}nbformat &middot; nbconvert &middot; scikit-learn &middot; XGBoost{% endblock %}
 
 {% block content %}
 <div class="page">
 
+  <!-- ══ LEFT ══ -->
   <div class="col-left">
+
     <div class="card">
-      <div class="card-hdr"><span class="card-lbl">Upload Notebook</span></div>
-      <div class="card-body" style="padding:14px;">
-        <div class="drop-zone" id="drop-zone">
-          <div class="drop-icon">
-            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          </div>
-          <div class="drop-title">Drop your .ipynb file here</div>
-          <div class="drop-sub">or click to browse</div>
+      <div class="card-hdr"><span class="card-lbl">Notebook</span></div>
+      <div class="card-body">
+        <div class="file-row">
+          <span class="file-label" id="file-label">No file chosen</span>
+          <button class="file-btn" type="button" onclick="document.getElementById('file-input').click()">Browse</button>
         </div>
-        <div id="file-name"></div>
         <input type="file" id="file-input" accept=".ipynb" style="display:none;">
         <button id="run-btn" class="btn" disabled>
-          <span id="btn-text">Run Notebook</span>
-          <div class="spinner" id="spinner"></div>
+          <span class="btn-inner">
+            <span id="btn-text">Run Notebook</span>
+            <div class="spinner" id="spinner"></div>
+          </span>
         </button>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-hdr"><span class="card-lbl">Tips</span></div>
-      <div class="card-body">
-        <ul class="tip-list">
-          <li><span class="tip-dot"></span><span>All <code style="font-size:11px;background:var(--soft);padding:1px 5px;">print()</code> statements, metrics, and matplotlib figures appear on the right.</span></li>
-          <li><span class="tip-dot"></span><span>Pandas DataFrames are rendered as styled tables.</span></li>
-          <li><span class="tip-dot"></span><span>Timeout is 10 minutes. Errors are shown in red.</span></li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="card">
       <div class="card-hdr"><span class="card-lbl">Example Notebooks</span></div>
-      <div class="card-body">
-        <a href="/notebooks/churn.ipynb" style="display:flex;align-items:center;gap:10px;text-decoration:none;padding:10px 12px;background:var(--smoke);border:1px solid var(--border);transition:.15s;" onmouseover="this.style.borderColor='var(--salmon)'" onmouseout="this.style.borderColor='var(--border)'">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--salmon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div class="card-body" style="padding:10px;">
+        <a href="/notebooks/churn.ipynb" download style="display:flex;align-items:center;gap:10px;text-decoration:none;padding:10px 12px;border:1px solid var(--border);background:var(--smoke);transition:.15s;" onmouseover="this.style.borderColor='var(--salmon)'" onmouseout="this.style.borderColor='var(--border)'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--salmon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <div>
             <div style="font-size:12px;font-weight:700;color:var(--ink);">churn.ipynb</div>
             <div style="font-size:11px;color:var(--muted);">Bank churn — 7 models</div>
@@ -113,9 +117,32 @@
         </a>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-hdr"><span class="card-lbl">Notes</span></div>
+      <div class="card-body">
+        <ul style="list-style:none;display:flex;flex-direction:column;gap:9px;">
+          <li style="display:flex;gap:9px;font-size:13px;font-weight:300;color:var(--gray);line-height:1.5;">
+            <span style="width:4px;height:4px;border-radius:50%;background:var(--salmon);flex-shrink:0;margin-top:8px;"></span>
+            <span>print(), metrics, and matplotlib figures all render inline.</span>
+          </li>
+          <li style="display:flex;gap:9px;font-size:13px;font-weight:300;color:var(--gray);line-height:1.5;">
+            <span style="width:4px;height:4px;border-radius:50%;background:var(--salmon);flex-shrink:0;margin-top:8px;"></span>
+            <span>DataFrames render as styled tables.</span>
+          </li>
+          <li style="display:flex;gap:9px;font-size:13px;font-weight:300;color:var(--gray);line-height:1.5;">
+            <span style="width:4px;height:4px;border-radius:50%;background:var(--salmon);flex-shrink:0;margin-top:8px;"></span>
+            <span>Execution runs on Render — 10 minute timeout.</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
   </div>
 
+  <!-- ══ RIGHT ══ -->
   <div class="col-right">
+
     <div id="error-box" class="err"><strong>Error:</strong> <span id="error-msg"></span></div>
 
     <div id="placeholder" class="placeholder">
@@ -124,64 +151,54 @@
       </div>
       <div>
         <p class="placeholder-title">No outputs yet</p>
-        <p class="placeholder-sub">Upload a Jupyter notebook and click Run Notebook to see execution outputs here.</p>
+        <p class="placeholder-sub">Choose a .ipynb file and click Run Notebook.</p>
       </div>
     </div>
 
     <div id="output-panel">
-      <p class="out-eye">Execution Results</p>
-      <div class="summary-bar">
-        <div class="summary-stat" id="stat-status">
-          <div class="summary-stat-val" id="stat-status-val">—</div>
-          <div class="summary-stat-lbl">Status</div>
+      <p class="nb-eye">Execution Results</p>
+
+      <div class="nb-stats">
+        <div class="nb-stat" id="stat-status">
+          <div class="nb-stat-val" id="stat-status-val">—</div>
+          <div class="nb-stat-lbl">Status</div>
         </div>
-        <div class="summary-stat">
-          <div class="summary-stat-val" id="stat-outputs-val">—</div>
-          <div class="summary-stat-lbl">Outputs</div>
+        <div class="nb-stat">
+          <div class="nb-stat-val" id="stat-outputs-val">—</div>
+          <div class="nb-stat-lbl">Outputs</div>
         </div>
-        <div class="summary-stat">
-          <div class="summary-stat-val" id="stat-images-val">—</div>
-          <div class="summary-stat-lbl">Figures</div>
+        <div class="nb-stat">
+          <div class="nb-stat-val" id="stat-figures-val">—</div>
+          <div class="nb-stat-lbl">Figures</div>
         </div>
       </div>
-      <div class="terminal" style="margin-top:2px;">
-        <div class="terminal-hdr">
-          <div class="terminal-dot" style="background:#ff5f57;"></div>
-          <div class="terminal-dot" style="background:#febc2e;"></div>
-          <div class="terminal-dot" style="background:#28c840;"></div>
-          <span class="terminal-title">Notebook Output</span>
-        </div>
-        <div class="terminal-body" id="terminal-body"></div>
-      </div>
+
+      <div class="nb-cells" id="nb-cells"></div>
     </div>
+
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  const dropZone  = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-  const fileNameEl = document.getElementById('file-name');
-  const runBtn    = document.getElementById('run-btn');
-  const btnText   = document.getElementById('btn-text');
-  const spinner   = document.getElementById('spinner');
+  const fileInput  = document.getElementById('file-input');
+  const fileLabel  = document.getElementById('file-label');
+  const runBtn     = document.getElementById('run-btn');
+  const btnText    = document.getElementById('btn-text');
+  const spinner    = document.getElementById('spinner');
   let selectedFile = null;
 
-  dropZone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', () => { if (fileInput.files.length) selectFile(fileInput.files[0]); });
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
-  dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('over'); if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]); });
-
-  function selectFile(f) {
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files[0];
+    if (!f) return;
     if (!f.name.endsWith('.ipynb')) { showError('Only .ipynb files are supported.'); return; }
     selectedFile = f;
-    fileNameEl.textContent = f.name;
-    fileNameEl.style.display = 'block';
+    fileLabel.textContent = f.name;
+    fileLabel.classList.add('chosen');
     runBtn.disabled = false;
     document.getElementById('error-box').style.display = 'none';
-  }
+  });
 
   runBtn.addEventListener('click', async () => {
     if (!selectedFile) return;
@@ -205,33 +222,57 @@
     document.getElementById('placeholder').style.display  = 'none';
     document.getElementById('output-panel').style.display = 'block';
 
-    const statusEl = document.getElementById('stat-status');
+    const statEl = document.getElementById('stat-status');
     document.getElementById('stat-status-val').textContent = success ? 'Success' : 'Error';
-    statusEl.className = 'summary-stat ' + (success ? 'ok' : 'err-stat');
+    statEl.className = 'nb-stat ' + (success ? 'ok' : 'err');
     document.getElementById('stat-outputs-val').textContent = outputs.length;
-    document.getElementById('stat-images-val').textContent  = outputs.filter(o => o.kind === 'image').length;
+    document.getElementById('stat-figures-val').textContent  = outputs.filter(o => o.kind === 'image').length;
 
-    const tb = document.getElementById('terminal-body');
-    tb.innerHTML = '';
+    const cells = document.getElementById('nb-cells');
+    cells.innerHTML = '';
 
-    if (error && !success) {
-      tb.innerHTML += `<div class="out-cell"><pre class="out-error">Execution stopped: ${esc(error)}</pre></div>`;
-    }
-    if (!outputs.length) {
-      tb.innerHTML += `<div class="out-cell"><pre class="out-stream" style="color:#666;">No outputs captured.</pre></div>`;
+    if (error && !success) cells.appendChild(makeCell('error', 'error', error));
+    if (!outputs.length && success) {
+      const el = document.createElement('div');
+      el.className = 'nb-cell';
+      el.innerHTML = `<div class="nb-cell-hdr"><span class="nb-badge stdout">stdout</span></div><pre class="nb-pre" style="color:var(--muted);">No outputs captured.</pre>`;
+      cells.appendChild(el);
     }
 
     outputs.forEach(out => {
-      const div = document.createElement('div');
-      div.className = 'out-cell';
-      if (out.kind === 'stream')      div.innerHTML = `<pre class="out-stream${out.name === 'stderr' ? ' stderr' : ''}">${esc(out.text)}</pre>`;
-      else if (out.kind === 'text')   div.innerHTML = `<pre class="out-text">${esc(out.text)}</pre>`;
-      else if (out.kind === 'error')  div.innerHTML = `<pre class="out-error">${esc(out.text)}</pre>`;
-      else if (out.kind === 'image')  div.innerHTML = `<div class="out-image"><img src="data:image/png;base64,${out.b64}" alt="figure"></div>`;
-      else if (out.kind === 'html')   div.innerHTML = `<div class="out-html">${out.html}</div>`;
-      tb.appendChild(div);
+      if (out.kind === 'stream')     cells.appendChild(makeCell(out.name === 'stderr' ? 'stderr' : 'stdout', out.name === 'stderr' ? 'stderr' : 'stdout', out.text));
+      else if (out.kind === 'text')  cells.appendChild(makeCell('output', 'output', out.text));
+      else if (out.kind === 'error') cells.appendChild(makeCell('error', 'error', out.text));
+      else if (out.kind === 'image') cells.appendChild(makeImageCell(out.b64));
+      else if (out.kind === 'html')  cells.appendChild(makeHtmlCell(out.html));
     });
-    tb.scrollTop = 0;
+  }
+
+  function makeCell(badge, type, text) {
+    const div = document.createElement('div');
+    div.className = 'nb-cell';
+    div.innerHTML = `
+      <div class="nb-cell-hdr"><span class="nb-badge ${badge}">${badge}</span></div>
+      <pre class="nb-pre${type === 'error' ? ' err' : ''}">${esc(text)}</pre>`;
+    return div;
+  }
+
+  function makeImageCell(b64) {
+    const div = document.createElement('div');
+    div.className = 'nb-cell';
+    div.innerHTML = `
+      <div class="nb-cell-hdr"><span class="nb-badge figure">figure</span></div>
+      <div class="nb-img"><img src="data:image/png;base64,${b64}" alt="figure"></div>`;
+    return div;
+  }
+
+  function makeHtmlCell(html) {
+    const div = document.createElement('div');
+    div.className = 'nb-cell';
+    div.innerHTML = `
+      <div class="nb-cell-hdr"><span class="nb-badge table">table</span></div>
+      <div class="nb-tbl">${html}</div>`;
+    return div;
   }
 
   function setLoading(on) {
