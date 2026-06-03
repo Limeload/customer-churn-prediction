@@ -1,123 +1,92 @@
 {% extends "base.html" %}
 
-{% block title %}ChurnGuard — Notebook Runner{% endblock %}
+{% block title %}ChurnGuard — Model API Testing{% endblock %}
 {% block nav_train %}active{% endblock %}
 
 {% block styles %}
-  :root { --left-w: 360px; }
+    :root { --left-w: 360px; }
 
-  /* ── Drop zone ── */
-  .drop-zone {
-    border: 2px dashed var(--border);
-    background: #fff;
-    padding: 40px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s, background .2s;
-    position: relative;
-  }
-  .drop-zone.drag-over { border-color: var(--salmon); background: var(--salmon10); }
-  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-  .drop-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--salmon10); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
-  .drop-icon svg { width: 18px; height: 18px; stroke: var(--salmon); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .drop-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
-  .drop-sub { font-size: 11px; font-weight: 300; color: var(--muted); }
+    /* ── Endpoint tabs ── */
+    .ep-tabs { display:flex; flex-direction:column; gap:2px; }
+    .ep-tab {
+      display:flex; align-items:center; gap:10px;
+      padding:11px 16px; background:#fff; border:1px solid var(--border);
+      font-family:inherit; cursor:pointer; transition:.15s; text-align:left; width:100%;
+    }
+    .ep-tab:hover { border-color:var(--salmon); }
+    .ep-tab.active { border-color:var(--salmon); background:var(--salmon10); }
+    .ep-tab-method {
+      font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+      padding:2px 6px; border:1px solid; flex-shrink:0;
+    }
+    .ep-tab-method.get  { color:#1a5fa8; border-color:#a8c8f0; background:#f0f5ff; }
+    .ep-tab-method.post { color:#2d7a3c; border-color:#a8d5b0; background:#f0faf2; }
+    .ep-tab-path { font-size:12px; font-weight:700; color:var(--ink); font-family:'SF Mono','Fira Code',monospace; }
+    .ep-tab-desc { font-size:11px; font-weight:300; color:var(--muted); margin-top:1px; }
 
-  /* ── File badge ── */
-  .file-badge {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    background: var(--smoke);
-    border: 1px solid var(--border);
-    margin-top: 2px;
-  }
-  .file-badge.visible { display: flex; }
-  .file-badge-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
-  .file-badge-name { font-size: 12px; font-weight: 700; color: var(--ink); font-family: 'SF Mono','Fira Code',monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .file-badge-size { font-size: 10px; color: var(--muted); flex-shrink: 0; }
-  .file-badge-remove { margin-left: auto; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; flex-shrink: 0; }
-  .file-badge-remove:hover { color: var(--ink); }
+    /* ── Param fields ── */
+    .param-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; }
+    .param-grid.g3 { grid-template-columns:1fr 1fr 1fr; }
+    .param-full { grid-column:1/-1; }
+    label.pl { display:block; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--gray); margin-bottom:4px; }
+    input.pi, select.pi {
+      width:100%; border:1px solid var(--border); background:#fff;
+      padding:7px 10px; font-size:12px; font-family:inherit; color:var(--ink);
+      appearance:none; -webkit-appearance:none; transition:border-color .15s;
+    }
+    input.pi:focus, select.pi:focus { outline:none; border-color:var(--salmon); }
+    select.pi {
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5'%3E%3Cpath fill='%23646464' d='M0 0l4.5 5L9 0z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 9px center; padding-right:26px; cursor:pointer;
+    }
+    .param-section { display:none; }
+    .param-section.active { display:block; }
 
-  /* ── Spinner ── */
-  .spinner { display: none; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .btn-inner { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    /* ── Run button with spinner ── */
+    .spinner { display:none; width:13px; height:13px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .btn-inner { display:flex; align-items:center; justify-content:center; gap:8px; }
 
-  /* ── Output panel ── */
-  .out-eye { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--salmon); margin-bottom: 10px; }
-  .out-meta { display: flex; gap: 2px; margin-bottom: 2px; }
-  .out-stat { flex: 1; background: #fff; border: 1px solid var(--border); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
-  .out-stat-val { font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-family: 'SF Mono','Fira Code',monospace; }
-  .out-stat-lbl { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-  .out-stat.ok  .out-stat-val { color: #2d7a3c; }
-  .out-stat.err .out-stat-val { color: #c0392b; }
+    /* ── Response panel ── */
+    .res-meta { display:flex; gap:2px; margin-bottom:2px; }
+    .res-stat {
+      flex:1; background:#fff; border:1px solid var(--border); padding:10px 14px;
+      display:flex; flex-direction:column; gap:2px;
+    }
+    .res-stat-val { font-size:1.1rem; font-weight:700; letter-spacing:-.02em; color:var(--ink); font-family:'SF Mono','Fira Code',monospace; }
+    .res-stat-lbl { font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+    .res-stat.ok  .res-stat-val { color:#2d7a3c; }
+    .res-stat.err .res-stat-val { color:#c0392b; }
 
-  /* ── Cell output blocks ── */
-  .cells-wrap { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
-  .cell-block { background: #fff; border: 1px solid var(--border); overflow: hidden; }
-  .cell-hdr {
-    padding: 7px 14px;
-    background: var(--smoke);
-    border-bottom: 1px solid var(--soft);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .cell-num { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
-  .cell-type {
-    font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-    padding: 2px 7px; border: 1px solid; flex-shrink: 0;
-  }
-  .cell-type.code    { color: #1a5fa8; border-color: #a8c8f0; background: #f0f5ff; }
-  .cell-type.markdown{ color: #7a3dc0; border-color: #c8a8f0; background: #f5f0ff; }
-  .cell-type.error   { color: #c0392b; border-color: #f0a8a8; background: #fff0f0; }
+    .res-eye { font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--salmon); margin-bottom:10px; }
 
-  .cell-source {
-    padding: 12px 16px;
-    font-family: 'SF Mono','Fira Code',monospace;
-    font-size: 12px; line-height: 1.65; white-space: pre-wrap; word-break: break-all;
-    color: var(--charcoal);
-    border-bottom: 1px solid var(--soft);
-    max-height: 260px; overflow-y: auto;
-  }
-  .cell-source:last-child { border-bottom: none; }
-  .cell-output {
-    padding: 12px 16px;
-    font-family: 'SF Mono','Fira Code',monospace;
-    font-size: 12px; line-height: 1.65; white-space: pre-wrap; word-break: break-all;
-    color: var(--charcoal);
-    background: #fafafa;
-    max-height: 360px; overflow-y: auto;
-  }
-  .cell-output.has-error { color: #c0392b; background: #fff8f7; }
-  .cell-output img { max-width: 100%; display: block; margin-top: 8px; }
+    .json-wrap { background:#fff; border:1px solid var(--border); overflow:hidden; }
+    .json-hdr { padding:8px 14px; background:var(--smoke); border-bottom:1px solid var(--soft); display:flex; align-items:center; justify-content:space-between; }
+    .json-pre {
+      padding:14px 16px; font-family:'SF Mono','Fira Code',monospace;
+      font-size:12px; line-height:1.7; white-space:pre; overflow-x:auto;
+      color:var(--charcoal); margin:0; max-height:520px; overflow-y:auto;
+    }
 
-  /* ── Raw JSON fallback ── */
-  .json-wrap { background: #fff; border: 1px solid var(--border); overflow: hidden; }
-  .json-hdr { padding: 8px 14px; background: var(--smoke); border-bottom: 1px solid var(--soft); display: flex; align-items: center; justify-content: space-between; }
-  .json-pre {
-    padding: 14px 16px; font-family: 'SF Mono','Fira Code',monospace;
-    font-size: 12px; line-height: 1.7; white-space: pre; overflow-x: auto;
-    color: var(--charcoal); margin: 0; max-height: 520px; overflow-y: auto;
-  }
-  .copy-btn { font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gray); background: transparent; border: 1px solid var(--border); padding: 4px 10px; cursor: pointer; transition: .2s; }
-  .copy-btn:hover { border-color: var(--gray); color: var(--ink); }
-  .copy-btn.ok { color: #2d7a3c; border-color: #a8d5b0; background: #f0faf2; }
+    /* JSON syntax colors */
+    .jk { color:#1a5fa8; }
+    .js { color:#2d7a3c; }
+    .jn { color:#c0392b; }
+    .jb { color:#9a6300; }
 
-  /* ── Info box ── */
-  .info-row { display: flex; align-items: flex-start; gap: 10px; padding: 11px 14px; background: var(--smoke); border: 1px solid var(--border); font-size: 12px; color: var(--gray); line-height: 1.5; }
-  .info-row strong { color: var(--ink); }
+    /* ── API URL badge ── */
+    .api-url-row { display:flex; align-items:center; gap:8px; padding:10px 12px; background:var(--smoke); border:1px solid var(--border); }
+    .api-dot { width:7px; height:7px; border-radius:50%; background:#2d7a3c; flex-shrink:0; }
+    .api-url { font-size:11px; font-family:'SF Mono','Fira Code',monospace; color:var(--gray); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 {% endblock %}
 
 {% block hero %}
-  <p class="hero-eye">Notebook Runner</p>
-  <h1 class="hero-title">Upload &amp; Run a Notebook.</h1>
-  <p class="hero-sub">Upload an <code>.ipynb</code> file and execute it against the deployed Render API — outputs stream back cell by cell.</p>
+  <p class="hero-eye">Model API Testing</p>
+  <h1 class="hero-title">Test the Prediction Models.</h1>
+  <p class="hero-sub">Run live requests against the deployed churn models — inspect raw predictions, response times, and per-model scores.</p>
 {% endblock %}
 
-{% block footer_stack %}Jupyter &middot; nbformat &middot; Render API &middot; Flask proxy{% endblock %}
+{% block footer_stack %}FastAPI &middot; scikit-learn &middot; XGBoost &middot; 7 bank models &middot; 5 telco models{% endblock %}
 
 {% block content %}
 <div class="page">
@@ -126,41 +95,175 @@
   <div class="col-left">
 
     <div class="card" style="margin-bottom:2px;">
-      <div class="card-hdr"><span class="card-lbl">Upload Notebook</span></div>
+      <div class="card-hdr"><span class="card-lbl">Deployment</span></div>
       <div class="card-body" style="padding:12px;">
-        <div class="drop-zone" id="drop-zone">
-          <input type="file" id="nb-file" accept=".ipynb">
-          <div class="drop-icon">
-            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          </div>
-          <p class="drop-title">Drop your notebook here</p>
-          <p class="drop-sub">or click to browse — .ipynb files only</p>
-        </div>
-
-        <div class="file-badge" id="file-badge">
-          <span class="file-badge-icon">📓</span>
-          <span class="file-badge-name" id="file-name">—</span>
-          <span class="file-badge-size" id="file-size"></span>
-          <button class="file-badge-remove" id="file-remove" type="button" title="Remove">✕</button>
+        <div class="api-url-row">
+          <div class="api-dot"></div>
+          <span class="api-url">customer-churn-prediction-02k2.onrender.com</span>
         </div>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:2px;">
-      <div class="card-hdr"><span class="card-lbl">Target</span></div>
-      <div class="card-body" style="padding:12px;">
-        <div class="info-row">
+    <div class="card">
+      <div class="card-hdr"><span class="card-lbl">Endpoints</span></div>
+      <div class="card-body" style="padding:10px;">
+        <div class="ep-tabs">
+          <button class="ep-tab active" data-ep="health" type="button">
+            <span class="ep-tab-method get">GET</span>
+            <div><div class="ep-tab-path">/health</div><div class="ep-tab-desc">API status &amp; loaded model count</div></div>
+          </button>
+          <button class="ep-tab" data-ep="models" type="button">
+            <span class="ep-tab-method get">GET</span>
+            <div><div class="ep-tab-path">/models</div><div class="ep-tab-desc">List all available ML models</div></div>
+          </button>
+          <button class="ep-tab" data-ep="bank" type="button">
+            <span class="ep-tab-method post">POST</span>
+            <div><div class="ep-tab-path">/predict/bank</div><div class="ep-tab-desc">Bank churn — 7 model ensemble</div></div>
+          </button>
+          <button class="ep-tab" data-ep="telco" type="button">
+            <span class="ep-tab-method post">POST</span>
+            <div><div class="ep-tab-path">/predict/telco</div><div class="ep-tab-desc">Telco churn — 5 model ensemble</div></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bank params -->
+    <div class="card param-section active" id="params-bank" style="display:none;">
+      <div class="card-hdr"><span class="card-lbl">Request Body</span><span class="card-meta">Bank Customer</span></div>
+      <div class="card-body">
+        <div class="param-grid">
+          <div class="param-full">
+            <label class="pl">Name</label>
+            <input class="pi" id="b-name" type="text" value="Jane Smith">
+          </div>
           <div>
-            <strong>Render API</strong><br>
-            customer-churn-prediction-02k2.onrender.com
+            <label class="pl">Age</label>
+            <input class="pi" id="b-age" type="number" value="42">
+          </div>
+          <div>
+            <label class="pl">Credit Score</label>
+            <input class="pi" id="b-credit" type="number" value="650">
+          </div>
+          <div>
+            <label class="pl">Geography</label>
+            <select class="pi" id="b-geo">
+              <option value="France" selected>France</option>
+              <option value="Germany">Germany</option>
+              <option value="Spain">Spain</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Gender</label>
+            <select class="pi" id="b-gender">
+              <option>Female</option><option>Male</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Balance ($)</label>
+            <input class="pi" id="b-balance" type="number" value="75000">
+          </div>
+          <div>
+            <label class="pl">Salary ($)</label>
+            <input class="pi" id="b-salary" type="number" value="85000">
+          </div>
+          <div>
+            <label class="pl">Tenure (yrs)</label>
+            <input class="pi" id="b-tenure" type="number" value="5">
+          </div>
+          <div>
+            <label class="pl">Products</label>
+            <select class="pi" id="b-products">
+              <option>1</option><option selected>2</option><option>3</option><option>4</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Credit Card</label>
+            <select class="pi" id="b-card">
+              <option value="1" selected>Yes</option><option value="0">No</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Active Member</label>
+            <select class="pi" id="b-active">
+              <option value="1" selected>Yes</option><option value="0">No</option>
+            </select>
           </div>
         </div>
       </div>
     </div>
 
-    <button id="run-btn" class="btn" type="button" disabled>
+    <!-- Telco params -->
+    <div class="card param-section" id="params-telco" style="display:none;">
+      <div class="card-hdr"><span class="card-lbl">Request Body</span><span class="card-meta">Telco Customer</span></div>
+      <div class="card-body">
+        <div class="param-grid">
+          <div class="param-full">
+            <label class="pl">Name</label>
+            <input class="pi" id="t-name" type="text" value="John Rivera">
+          </div>
+          <div>
+            <label class="pl">Gender</label>
+            <select class="pi" id="t-gender">
+              <option>Male</option><option>Female</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Tenure (mo)</label>
+            <input class="pi" id="t-tenure" type="number" value="12">
+          </div>
+          <div>
+            <label class="pl">Monthly ($)</label>
+            <input class="pi" id="t-monthly" type="number" value="89.85" step="0.01">
+          </div>
+          <div>
+            <label class="pl">Total ($)</label>
+            <input class="pi" id="t-total" type="number" value="1078.20" step="0.01">
+          </div>
+          <div>
+            <label class="pl">Contract</label>
+            <select class="pi" id="t-contract">
+              <option value="Month-to-month" selected>Month-to-month</option>
+              <option value="One year">One year</option>
+              <option value="Two year">Two year</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Internet</label>
+            <select class="pi" id="t-internet">
+              <option value="DSL">DSL</option>
+              <option value="Fiber optic" selected>Fiber optic</option>
+              <option value="No">None</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Payment</label>
+            <select class="pi" id="t-payment">
+              <option value="Electronic check" selected>Electronic check</option>
+              <option value="Mailed check">Mailed check</option>
+              <option value="Bank transfer (automatic)">Bank transfer</option>
+              <option value="Credit card (automatic)">Credit card</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Senior Citizen</label>
+            <select class="pi" id="t-senior">
+              <option value="0" selected>No</option><option value="1">Yes</option>
+            </select>
+          </div>
+          <div>
+            <label class="pl">Tech Support</label>
+            <select class="pi" id="t-tech">
+              <option value="No" selected>No</option><option value="Yes">Yes</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button id="run-btn" class="btn" type="button">
       <span class="btn-inner">
-        <span id="btn-text">Run Notebook</span>
+        <span id="btn-text">Send Request</span>
         <div class="spinner" id="spinner"></div>
       </span>
     </button>
@@ -174,31 +277,37 @@
 
     <div id="placeholder" class="placeholder">
       <div class="placeholder-dot">
-        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
       </div>
       <div>
-        <p class="placeholder-title">No output yet</p>
-        <p class="placeholder-sub">Upload a notebook and click Run Notebook.</p>
+        <p class="placeholder-title">No response yet</p>
+        <p class="placeholder-sub">Select an endpoint and click Send Request.</p>
       </div>
     </div>
 
-    <div id="output-panel" style="display:none;">
-      <p class="out-eye">Execution Output</p>
-      <div class="out-meta">
-        <div class="out-stat" id="stat-status">
-          <div class="out-stat-val" id="stat-status-val">—</div>
-          <div class="out-stat-lbl">Status</div>
+    <div id="response-panel" style="display:none;">
+      <p class="res-eye">Response</p>
+      <div class="res-meta">
+        <div class="res-stat" id="stat-status">
+          <div class="res-stat-val" id="stat-status-val">—</div>
+          <div class="res-stat-lbl">Status</div>
         </div>
-        <div class="out-stat">
-          <div class="out-stat-val" id="stat-time-val">—</div>
-          <div class="out-stat-lbl">Time (ms)</div>
+        <div class="res-stat">
+          <div class="res-stat-val" id="stat-time-val">—</div>
+          <div class="res-stat-lbl">Time (ms)</div>
         </div>
-        <div class="out-stat">
-          <div class="out-stat-val" id="stat-cells-val">—</div>
-          <div class="out-stat-lbl">Cells</div>
+        <div class="res-stat">
+          <div class="res-stat-val" id="stat-ep-val">—</div>
+          <div class="res-stat-lbl">Endpoint</div>
         </div>
       </div>
-      <div id="cells-wrap" class="cells-wrap"></div>
+      <div class="json-wrap" style="margin-top:2px;">
+        <div class="json-hdr">
+          <span class="card-lbl">Response Body</span>
+          <button id="copy-btn" class="copy-btn" type="button">Copy JSON</button>
+        </div>
+        <pre class="json-pre" id="json-output"></pre>
+      </div>
     </div>
 
   </div>
@@ -206,74 +315,54 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+  .copy-btn { font-family:inherit; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--gray); background:transparent; border:1px solid var(--border); padding:4px 10px; cursor:pointer; transition:.2s; }
+  .copy-btn:hover { border-color:var(--gray); color:var(--ink); }
+  .copy-btn.ok { color:#2d7a3c; border-color:#a8d5b0; background:#f0faf2; }
+</style>
 <script>
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('nb-file');
-  const fileBadge = document.getElementById('file-badge');
-  const fileName  = document.getElementById('file-name');
-  const fileSize  = document.getElementById('file-size');
-  const fileRemove= document.getElementById('file-remove');
-  const runBtn    = document.getElementById('run-btn');
+  let activeEp = 'health';
+  let rawJson  = null;
 
-  let selectedFile = null;
+  const EP_META = {
+    health: { method:'GET',  path:'/api/health' },
+    models: { method:'GET',  path:'/api/models' },
+    bank:   { method:'POST', path:'/api/predict/bank' },
+    telco:  { method:'POST', path:'/api/predict/telco' },
+  };
 
-  function setFile(f) {
-    if (!f || !f.name.endsWith('.ipynb')) {
-      showError('Please select a .ipynb file.');
-      return;
-    }
-    selectedFile = f;
-    fileName.textContent = f.name;
-    fileSize.textContent = (f.size / 1024).toFixed(1) + ' KB';
-    fileBadge.classList.add('visible');
-    runBtn.disabled = false;
-    document.getElementById('error-box').style.display = 'none';
-  }
-
-  function clearFile() {
-    selectedFile = null;
-    fileInput.value = '';
-    fileBadge.classList.remove('visible');
-    runBtn.disabled = true;
-  }
-
-  fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
-  fileRemove.addEventListener('click', (e) => { e.stopPropagation(); clearFile(); });
-
-  dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', ()  => { dropZone.classList.remove('drag-over'); });
-  dropZone.addEventListener('drop',      (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f) setFile(f);
+  // Tab switching
+  document.querySelectorAll('.ep-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.ep-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeEp = tab.dataset.ep;
+      document.getElementById('params-bank').style.display  = activeEp === 'bank'  ? '' : 'none';
+      document.getElementById('params-telco').style.display = activeEp === 'telco' ? '' : 'none';
+    });
   });
 
-  runBtn.addEventListener('click', async () => {
-    if (!selectedFile) return;
+  document.getElementById('run-btn').addEventListener('click', async () => {
     setLoading(true);
     document.getElementById('error-box').style.display = 'none';
-
-    const fd = new FormData();
-    fd.append('notebook', selectedFile);
-    const t0 = Date.now();
+    const meta   = EP_META[activeEp];
+    const t0     = Date.now();
 
     try {
-      const resp = await fetch('/train/run', { method: 'POST', body: fd });
+      let resp;
+      if (meta.method === 'GET') {
+        resp = await fetch(meta.path);
+      } else {
+        const body = activeEp === 'bank' ? bankPayload() : telcoPayload();
+        resp = await fetch(meta.path, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      }
       const elapsed = Date.now() - t0;
-      const text = await resp.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        showError(`Server error: ${text.slice(0, 200)}`);
-        return;
-      }
-      if (!resp.ok) {
-        showError(data.error || `Server returned ${resp.status}`);
-        return;
-      }
-      renderOutput(resp.status, elapsed, data);
+      const data    = await resp.json();
+      showResponse(resp.status, elapsed, meta.path, data);
     } catch (err) {
       showError(err.message);
     } finally {
@@ -281,81 +370,99 @@
     }
   });
 
-  function renderOutput(status, elapsed, data) {
-    document.getElementById('placeholder').style.display  = 'none';
-    document.getElementById('output-panel').style.display = 'block';
+  function bankPayload() {
+    return {
+      name:             v('b-name'),
+      credit_score:     +v('b-credit'),
+      geography:        v('b-geo'),
+      gender:           v('b-gender'),
+      age:              +v('b-age'),
+      tenure:           +v('b-tenure'),
+      balance:          +v('b-balance'),
+      num_products:     +v('b-products'),
+      has_cr_card:      +v('b-card'),
+      is_active_member: +v('b-active'),
+      estimated_salary: +v('b-salary'),
+    };
+  }
+
+  function telcoPayload() {
+    return {
+      name:             v('t-name'),
+      gender:           v('t-gender'),
+      senior_citizen:   +v('t-senior'),
+      partner:          'No',
+      dependents:       'No',
+      tenure:           +v('t-tenure'),
+      phone_service:    'Yes',
+      multiple_lines:   'No',
+      internet_service: v('t-internet'),
+      online_security:  'No',
+      online_backup:    'No',
+      device_protection:'No',
+      tech_support:     v('t-tech'),
+      streaming_tv:     'No',
+      streaming_movies: 'No',
+      contract:         v('t-contract'),
+      paperless_billing:'Yes',
+      payment_method:   v('t-payment'),
+      monthly_charges:  +v('t-monthly'),
+      total_charges:    +v('t-total'),
+    };
+  }
+
+  function showResponse(status, elapsed, path, data) {
+    rawJson = data;
+    document.getElementById('placeholder').style.display      = 'none';
+    document.getElementById('response-panel').style.display   = 'block';
 
     const statEl = document.getElementById('stat-status');
-    const ok = data.success !== false;
-    document.getElementById('stat-status-val').textContent = ok ? 'OK' : 'Error';
-    statEl.className = 'out-stat ' + (ok ? 'ok' : 'err');
-    document.getElementById('stat-time-val').textContent  = elapsed;
+    document.getElementById('stat-status-val').textContent    = status;
+    statEl.className = 'res-stat ' + (status >= 200 && status < 300 ? 'ok' : 'err');
+    document.getElementById('stat-time-val').textContent      = elapsed;
+    document.getElementById('stat-ep-val').textContent        = path;
 
-    const outputs = data.outputs || [];
-    document.getElementById('stat-cells-val').textContent = outputs.length;
+    document.getElementById('json-output').innerHTML = syntaxHighlight(data);
+    resetCopy();
+  }
 
-    const wrap = document.getElementById('cells-wrap');
-    wrap.innerHTML = '';
-
-    if (data.error) {
-      const errEl = document.createElement('div');
-      errEl.className = 'cell-output has-error';
-      errEl.style.cssText = 'margin-bottom:2px;border:1px solid var(--border);';
-      errEl.textContent = data.error;
-      wrap.appendChild(errEl);
-    }
-
-    outputs.forEach((out, i) => {
-      const block = document.createElement('div');
-      block.className = 'cell-block';
-
-      const hdr = document.createElement('div');
-      hdr.className = 'cell-hdr';
-      const kindLabel = out.kind === 'stream' ? (out.name || 'stdout') : out.kind;
-      const kindClass = out.kind === 'error' ? 'error' : 'code';
-      hdr.innerHTML = `<span class="cell-num">Output ${i + 1}</span><span class="cell-type ${kindClass}">${esc(kindLabel)}</span>`;
-      block.appendChild(hdr);
-
-      const body = document.createElement('div');
-
-      if (out.kind === 'image') {
-        body.className = 'cell-output';
-        const img = document.createElement('img');
-        img.src = 'data:image/png;base64,' + out.b64.trim();
-        body.appendChild(img);
-      } else if (out.kind === 'html') {
-        body.className = 'cell-output';
-        const html = Array.isArray(out.html) ? out.html.join('') : out.html;
-        body.innerHTML = html.replace(/<script[\s\S]*?<\/script>/gi, '');
-      } else {
-        body.className = 'cell-output' + (out.kind === 'error' ? ' has-error' : '');
-        body.textContent = Array.isArray(out.text) ? out.text.join('') : (out.text || '');
+  function syntaxHighlight(json) {
+    const s = JSON.stringify(json, null, 2);
+    return s.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, match => {
+      if (/^"/.test(match)) {
+        return /:$/.test(match)
+          ? `<span class="jk">${esc(match)}</span>`
+          : `<span class="js">${esc(match)}</span>`;
       }
-
-      block.appendChild(body);
-      wrap.appendChild(block);
+      if (/true|false/.test(match)) return `<span class="jb">${match}</span>`;
+      if (/null/.test(match))       return `<span class="jn">${match}</span>`;
+      return `<span class="jn">${match}</span>`;
     });
-
-    if (outputs.length === 0 && !data.error) {
-      const empty = document.createElement('div');
-      empty.className = 'cell-output';
-      empty.style.cssText = 'border:1px solid var(--border);color:var(--muted);font-style:italic;';
-      empty.textContent = 'Notebook executed with no output.';
-      wrap.appendChild(empty);
-    }
   }
 
   function setLoading(on) {
-    runBtn.disabled = on;
-    document.getElementById('btn-text').style.display = on ? 'none' : 'inline';
-    document.getElementById('spinner').style.display  = on ? 'block' : 'none';
+    const btn = document.getElementById('run-btn');
+    btn.disabled = on;
+    document.getElementById('btn-text').style.display  = on ? 'none' : 'inline';
+    document.getElementById('spinner').style.display   = on ? 'block' : 'none';
   }
-
   function showError(msg) {
     document.getElementById('error-msg').textContent = msg;
     document.getElementById('error-box').style.display = 'block';
   }
-
+  function v(id) { return document.getElementById(id).value; }
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function resetCopy() {
+    const b = document.getElementById('copy-btn');
+    b.textContent = 'Copy JSON'; b.className = 'copy-btn';
+  }
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    navigator.clipboard.writeText(JSON.stringify(rawJson, null, 2)).then(() => {
+      const b = document.getElementById('copy-btn');
+      b.textContent = 'Copied'; b.className = 'copy-btn ok';
+      setTimeout(resetCopy, 2000);
+    });
+  });
 </script>
 {% endblock %}
