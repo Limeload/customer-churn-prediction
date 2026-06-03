@@ -1,9 +1,12 @@
+import json
+import logging
 import os
 import pickle
 import numpy as np
 from huggingface_hub import hf_hub_download
 
 HF_REPO_ID = os.getenv("HF_REPO_ID", "shraddharaom/churnguard-models")
+logger = logging.getLogger(__name__)
 
 
 def _load_pkl(local_path: str) -> object:
@@ -14,6 +17,16 @@ def _load_pkl(local_path: str) -> object:
     path = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
     with open(path, "rb") as f:
         return pickle.load(f)
+
+
+def _load_json(local_path: str) -> dict:
+    if os.path.exists(local_path):
+        with open(local_path) as f:
+            return json.load(f)
+    hf_file = local_path.removeprefix("models/")
+    path = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
+    with open(path) as f:
+        return json.load(f)
 
 TELCO_MODELS = {
     'XGBoost':           'models/telco/xgboost.pkl',
@@ -31,6 +44,37 @@ def load_telco_models():
 
 def load_telco_scaler():
     return _load_pkl("models/telco/scaler.pkl")
+
+
+def validate_telco_schema() -> None:
+    """Assert saved feature schema matches FEATURE_COLS; warn on library version drift."""
+    import sklearn, xgboost as xgb_lib
+
+    try:
+        schema = _load_json("models/telco/schema.json")
+    except Exception:
+        logger.warning("models/telco/schema.json not found — retrain to generate feature schema")
+        return
+
+    saved_cols = schema.get("feature_columns", [])
+    if saved_cols != FEATURE_COLS:
+        raise RuntimeError(
+            f"Telco feature column mismatch between schema and inference code.\n"
+            f"  Expected : {FEATURE_COLS}\n"
+            f"  In schema: {saved_cols}"
+        )
+
+    current = {
+        "scikit-learn": sklearn.__version__,
+        "xgboost":      xgb_lib.__version__,
+        "numpy":        np.__version__,
+    }
+    for lib, trained_ver in schema.get("trained_with", {}).items():
+        if current.get(lib) != trained_ver:
+            logger.warning(
+                "Telco models trained with %s==%s but running %s==%s",
+                lib, trained_ver, lib, current.get(lib),
+            )
 
 
 # Feature order must exactly match training (get_dummies drop_first=True)

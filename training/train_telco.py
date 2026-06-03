@@ -187,4 +187,20 @@ saves = {
 for name, obj in saves.items():
     with open(MDIR / name, "wb") as f:
         pickle.dump(obj, f)
-print(f"\nTelco models saved to {MDIR}")
+
+# ── Save feature schema ───────────────────────────────────────────────────────
+import json, sklearn, xgboost as xgb_lib
+
+schema = {
+    "feature_columns": list(X.columns),
+    "n_features": int(X.shape[1]),
+    "trained_with": {
+        "scikit-learn": sklearn.__version__,
+        "xgboost":      xgb_lib.__version__,
+        "numpy":        np.__version__,
+    },
+}
+with open(MDIR / "schema.json", "w") as f:
+    json.dump(schema, f, indent=2)
+
+print(f"\nTelco models and schema saved to {MDIR}")

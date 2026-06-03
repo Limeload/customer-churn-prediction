@@ -36,8 +36,8 @@ def _require_train_key(key: str | None = Depends(_api_key_header)) -> None:
 
 import numpy as np
 from notebook_runner import run_notebook
-from utils import load_models, load_scaler, preprocess, predict_all
-from utils_telco import load_telco_models, load_telco_scaler, preprocess_telco, predict_telco
+from utils import load_models, load_scaler, preprocess, predict_all, validate_bank_schema
+from utils_telco import load_telco_models, load_telco_scaler, preprocess_telco, predict_telco, validate_telco_schema
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -68,10 +68,12 @@ def _load_or_exit(loader, label):
         logger.critical("Failed to load %s: %s", label, exc)
         sys.exit(1)
 
-bank_models  = _load_or_exit(load_models,       "bank models (7)")
-bank_scaler  = _load_or_exit(load_scaler,       "bank scaler")
-telco_models = _load_or_exit(load_telco_models, "telco models (5)")
-telco_scaler = _load_or_exit(load_telco_scaler, "telco scaler")
+bank_models  = _load_or_exit(load_models,          "bank models (7)")
+bank_scaler  = _load_or_exit(load_scaler,          "bank scaler")
+_load_or_exit(validate_bank_schema,                "bank feature schema")
+telco_models = _load_or_exit(load_telco_models,    "telco models (5)")
+telco_scaler = _load_or_exit(load_telco_scaler,    "telco scaler")
+_load_or_exit(validate_telco_schema,               "telco feature schema")
 
 # ── OpenAPI named examples (shown as a dropdown in Swagger UI) ────────────────
 _BANK_EXAMPLES = {
