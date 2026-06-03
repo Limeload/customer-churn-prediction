@@ -10,9 +10,7 @@ Endpoints:
 """
 import logging
 import os
-import re
 import sys
-import tempfile
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -37,14 +35,7 @@ def _require_train_key(key: str | None = Depends(_api_key_header)) -> None:
         raise HTTPException(status_code=403, detail="Invalid or missing X-Train-Key header")
 
 import numpy as np
-import nbformat
-from nbconvert.preprocessors import ExecutePreprocessor
-
-_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[mK]')
-
-def _clean(text: str) -> str:
-    return _ANSI_RE.sub('', str(text))
-
+from notebook_runner import run_notebook
 from utils import load_models, load_scaler, preprocess, predict_all
 from utils_telco import load_telco_models, load_telco_scaler, preprocess_telco, predict_telco
 
@@ -243,47 +234,7 @@ async def train_run(notebook: UploadFile = File(...)):
     if len(content) > _MAX_NB_BYTES:
         raise HTTPException(status_code=413, detail="Notebook exceeds 5 MB limit")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        path = os.path.join(tmpdir, "nb.ipynb")
-        with open(path, "wb") as f:
-            f.write(content)
-        with open(path) as fh:
-            nb = nbformat.read(fh, as_version=4)
-
-        ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
-        success, exec_error = True, None
-        try:
-            ep.preprocess(nb, {"metadata": {"path": tmpdir}})
-        except Exception as exc:
-            success = False
-            exec_error = _clean(str(exc))
-
-        outputs = []
-        for cell in nb.cells:
-            if cell.cell_type != "code":
-                continue
-            for out in cell.get("outputs", []):
-                ot = out.get("output_type", "")
-                if ot == "stream":
-                    txt = _clean(out.get("text", ""))
-                    if txt.strip():
-                        outputs.append({"kind": "stream", "name": out.get("name", "stdout"), "text": txt})
-                elif ot in ("display_data", "execute_result"):
-                    d = out.get("data", {})
-                    if "image/png" in d:
-                        outputs.append({"kind": "image", "b64": d["image/png"]})
-                    elif "text/html" in d:
-                        outputs.append({"kind": "html", "html": d["text/html"]})
-                    elif "text/plain" in d:
-                        txt = _clean(d["text/plain"])
-                        if txt.strip():
-                            outputs.append({"kind": "text", "text": txt})
-                elif ot == "error":
-                    tb = _clean("\n".join(out.get("traceback",
-                        [f"{out.get('ename','Error')}: {out.get('evalue','')}"])))
-                    outputs.append({"kind": "error", "text": tb})
-
-    return {"success": success, "error": exec_error, "outputs": outputs}
+    return run_notebook(content)
 
 
 if __name__ == "__main__":
