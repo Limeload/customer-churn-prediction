@@ -126,8 +126,11 @@ def validate_bank_schema() -> None:
 
 
 def preprocess(form_data):
-    credit_score = float(form_data['credit_score'])
-    geography    = GEOGRAPHY_MAP.get(form_data['geography'], 0)
+    credit_score  = float(form_data['credit_score'])
+    geo_raw       = form_data['geography']
+    if geo_raw not in GEOGRAPHY_MAP:
+        logger.warning("Bank inference: unknown geography %r, defaulting to cluster 0 (France)", geo_raw)
+    geography     = GEOGRAPHY_MAP.get(geo_raw, 0)
     gender       = GENDER_MAP[form_data['gender']]
     age          = float(form_data['age'])
     tenure       = float(form_data['tenure'])

@@ -77,6 +77,40 @@ def validate_telco_schema() -> None:
             )
 
 
+# Allowed categorical values — mirrors the training data distribution.
+# Any value outside these sets is unseen by the models and should be flagged.
+_ALLOWED: dict[str, set] = {
+    "gender":           {"Male", "Female"},
+    "partner":          {"Yes", "No"},
+    "dependents":       {"Yes", "No"},
+    "phone_service":    {"Yes", "No"},
+    "multiple_lines":   {"Yes", "No"},
+    "internet_service": {"DSL", "Fiber optic", "No"},
+    "online_security":  {"Yes", "No"},
+    "online_backup":    {"Yes", "No"},
+    "device_protection":{"Yes", "No"},
+    "tech_support":     {"Yes", "No"},
+    "streaming_tv":     {"Yes", "No"},
+    "streaming_movies": {"Yes", "No"},
+    "contract":         {"Month-to-month", "One year", "Two year"},
+    "paperless_billing":{"Yes", "No"},
+    "payment_method":   {
+        "Electronic check", "Mailed check",
+        "Bank transfer (automatic)", "Credit card (automatic)",
+    },
+}
+
+
+def _warn_unexpected(f: dict) -> None:
+    for field, allowed in _ALLOWED.items():
+        val = f.get(field)
+        if val is not None and str(val) not in allowed:
+            logger.warning(
+                "Telco inference: unexpected value %r for field %r (allowed: %s)",
+                val, field, sorted(allowed),
+            )
+
+
 # Feature order must exactly match training (get_dummies drop_first=True)
 FEATURE_COLS = [
     'gender', 'SeniorCitizen', 'Partner', 'Dependents',
@@ -104,6 +138,7 @@ def _one_hot(prefix, value, options):
 
 
 def preprocess_telco(f):
+    _warn_unexpected(f)
     monthly  = float(f.get('monthly_charges', 0))
     total    = float(f.get('total_charges', 0))
     tenure   = float(f.get('tenure', 0))

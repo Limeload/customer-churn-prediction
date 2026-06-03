@@ -32,6 +32,38 @@ df = df.drop(columns=["customerID"])
 df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
 df["TotalCharges"] = df["TotalCharges"].fillna(df["MonthlyCharges"])
 
+# ── Categorical integrity checks ──────────────────────────────────────────────
+_EXPECTED = {
+    "gender":           {"Male", "Female"},
+    "Partner":          {"Yes", "No"},
+    "Dependents":       {"Yes", "No"},
+    "PhoneService":     {"Yes", "No"},
+    "MultipleLines":    {"Yes", "No", "No phone service"},
+    "InternetService":  {"DSL", "Fiber optic", "No"},
+    "OnlineSecurity":   {"Yes", "No", "No internet service"},
+    "OnlineBackup":     {"Yes", "No", "No internet service"},
+    "DeviceProtection": {"Yes", "No", "No internet service"},
+    "TechSupport":      {"Yes", "No", "No internet service"},
+    "StreamingTV":      {"Yes", "No", "No internet service"},
+    "StreamingMovies":  {"Yes", "No", "No internet service"},
+    "Contract":         {"Month-to-month", "One year", "Two year"},
+    "PaperlessBilling": {"Yes", "No"},
+    "PaymentMethod":    {
+        "Electronic check", "Mailed check",
+        "Bank transfer (automatic)", "Credit card (automatic)",
+    },
+    "Churn":            {"Yes", "No"},
+}
+for col, allowed in _EXPECTED.items():
+    if col not in df.columns:
+        continue
+    unexpected = set(df[col].dropna().unique()) - allowed
+    assert not unexpected, (
+        f"Unexpected values in column '{col}': {unexpected}. "
+        f"Update _EXPECTED or clean the data."
+    )
+print("Categorical integrity checks passed.")
+
 # Binary yes/no columns
 binary_cols = ["Partner", "Dependents", "PhoneService", "PaperlessBilling", "Churn"]
 for col in binary_cols:
