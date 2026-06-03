@@ -143,11 +143,15 @@ Users must be able to upload a `.ipynb` notebook, have it executed server-side, 
 | Layer | Location |
 |---|---|
 | REST API | `POST /train/run` → [api.py:208](api.py#L208) |
-| Flask UI route | `POST /train/run` → [app.py:247](app.py#L247) |
+| Flask UI route | `POST /train/run` → [app.py:251](app.py#L251) |
 | UI page | [templates/train.html](templates/train.html) |
 | Notebook execution | `nbconvert.ExecutePreprocessor` |
 | Output types handled | `stream`, `execute_result`, `display_data` (text/html/image/png), `error` |
+| Authentication | `X-Train-Key` header must match `TRAIN_API_KEY` env var; endpoint returns 503 if var is unset |
+| Size limit | Notebooks larger than 5 MB are rejected with HTTP 413 |
 | Tests | None (requires kernel; validate by uploading a notebook in the UI) |
+
+> **Security note:** Notebook execution runs arbitrary uploaded Python code. The API key guard and size cap are a minimum baseline. For production, also run `ExecutePreprocessor` in an isolated container with `--network none` and CPU/memory limits.
 
 ---
 

@@ -13,10 +13,22 @@ import re
 import tempfile
 import warnings
 warnings.filterwarnings("ignore")
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 from typing import Literal
+
+_TRAIN_KEY = os.getenv("TRAIN_API_KEY", "")
+_MAX_NB_BYTES = 5 * 1024 * 1024  # 5 MB
+
+_api_key_header = APIKeyHeader(name="X-Train-Key", auto_error=False)
+
+def _require_train_key(key: str | None = Depends(_api_key_header)) -> None:
+    if not _TRAIN_KEY:
+        raise HTTPException(status_code=503, detail="Notebook execution is disabled (TRAIN_API_KEY not configured)")
+    if key != _TRAIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing X-Train-Key header")
 import numpy as np
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
@@ -205,13 +217,15 @@ def predict_telco_endpoint(customer: TelcoCustomer):
     )
 
 
-@app.post("/train/run", tags=["Training"])
+@app.post("/train/run", tags=["Training"], dependencies=[Depends(_require_train_key)])
 async def train_run(notebook: UploadFile = File(...)):
-    """Execute an uploaded .ipynb notebook and return all cell outputs."""
+    """Execute an uploaded .ipynb notebook and return all cell outputs. Requires X-Train-Key header."""
     if not notebook.filename.lower().endswith(".ipynb"):
         raise HTTPException(status_code=400, detail="Only .ipynb files are accepted")
 
     content = await notebook.read()
+    if len(content) > _MAX_NB_BYTES:
+        raise HTTPException(status_code=413, detail="Notebook exceeds 5 MB limit")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path = os.path.join(tmpdir, "nb.ipynb")

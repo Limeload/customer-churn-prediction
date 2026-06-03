@@ -244,13 +244,24 @@ def serve_notebook(filename):
     )
 
 
+_TRAIN_KEY = os.getenv("TRAIN_API_KEY", "")
+_MAX_NB_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
 @app.route("/train/run", methods=["POST"])
 def train_run():
+    if not _TRAIN_KEY:
+        return jsonify({"error": "Notebook execution is disabled (TRAIN_API_KEY not configured)"}), 503
+    if request.headers.get("X-Train-Key") != _TRAIN_KEY:
+        return jsonify({"error": "Invalid or missing X-Train-Key header"}), 403
     try:
         if "notebook" not in request.files:
             return jsonify({"error": "No file provided"}), 400
         nb_file = request.files["notebook"]
-        nb = nbformat.reads(nb_file.read().decode("utf-8"), as_version=4)
+        raw = nb_file.read()
+        if len(raw) > _MAX_NB_BYTES:
+            return jsonify({"error": "Notebook exceeds 5 MB limit"}), 413
+        nb = nbformat.reads(raw.decode("utf-8"), as_version=4)
         ep = ExecutePreprocessor(timeout=600, kernel_name="python3")
         success, exec_error = True, None
         try:
