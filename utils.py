@@ -90,8 +90,8 @@ def preprocess(form_data):
     balance      = float(form_data['balance'])
     num_products = float(form_data['num_products'])
     has_cr_card  = float(form_data['has_cr_card'])
-    is_active    = float(form_data['is_active'])
-    salary       = float(form_data['salary'])
+    is_active    = float(form_data['is_active_member'])
+    salary       = float(form_data['estimated_salary'])
 
     balance_salary_ratio = balance / (salary + 1)
     tenure_age_ratio     = tenure  / (age + 1)

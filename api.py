@@ -190,9 +190,9 @@ def predict_bank(customer: BankCustomer):
         "tenure":       str(customer.tenure),
         "balance":      str(customer.balance),
         "num_products": str(customer.num_products),
-        "has_cr_card":  str(customer.has_cr_card),
-        "is_active":    str(customer.is_active_member),
-        "salary":       str(customer.estimated_salary),
+        "has_cr_card":       str(customer.has_cr_card),
+        "is_active_member":  str(customer.is_active_member),
+        "estimated_salary":  str(customer.estimated_salary),
     }
     try:
         features    = preprocess(form)
