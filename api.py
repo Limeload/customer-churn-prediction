@@ -73,11 +73,64 @@ bank_scaler  = _load_or_exit(load_scaler,       "bank scaler")
 telco_models = _load_or_exit(load_telco_models, "telco models (5)")
 telco_scaler = _load_or_exit(load_telco_scaler, "telco scaler")
 
+# ── OpenAPI named examples (shown as a dropdown in Swagger UI) ────────────────
+_BANK_EXAMPLES = {
+    "low_risk": {
+        "summary": "Low-risk customer",
+        "value": {
+            "name": "Alice Chen", "credit_score": 750, "geography": "France",
+            "gender": "Female", "age": 30, "tenure": 8, "balance": 95000,
+            "num_products": 1, "has_cr_card": 1, "is_active_member": 1,
+            "estimated_salary": 120000,
+        },
+    },
+    "high_risk": {
+        "summary": "High-risk customer",
+        "value": {
+            "name": "Bob Müller", "credit_score": 480, "geography": "Germany",
+            "gender": "Male", "age": 55, "tenure": 2, "balance": 0,
+            "num_products": 4, "has_cr_card": 0, "is_active_member": 0,
+            "estimated_salary": 42000,
+        },
+    },
+}
+
+_TELCO_EXAMPLES = {
+    "low_risk": {
+        "summary": "Long-term contract customer",
+        "value": {
+            "name": "Maria Santos", "gender": "Female", "senior_citizen": 0,
+            "partner": "Yes", "dependents": "Yes", "tenure": 60,
+            "phone_service": "Yes", "multiple_lines": "Yes",
+            "internet_service": "DSL", "online_security": "Yes",
+            "online_backup": "Yes", "device_protection": "Yes", "tech_support": "Yes",
+            "streaming_tv": "No", "streaming_movies": "No",
+            "contract": "Two year", "paperless_billing": "No",
+            "payment_method": "Bank transfer (automatic)",
+            "monthly_charges": 45.00, "total_charges": 2700.00,
+        },
+    },
+    "high_risk": {
+        "summary": "Month-to-month fiber customer",
+        "value": {
+            "name": "John Rivera", "gender": "Male", "senior_citizen": 0,
+            "partner": "No", "dependents": "No", "tenure": 12,
+            "phone_service": "Yes", "multiple_lines": "No",
+            "internet_service": "Fiber optic", "online_security": "No",
+            "online_backup": "No", "device_protection": "No", "tech_support": "No",
+            "streaming_tv": "Yes", "streaming_movies": "Yes",
+            "contract": "Month-to-month", "paperless_billing": "Yes",
+            "payment_method": "Electronic check",
+            "monthly_charges": 89.85, "total_charges": 1078.20,
+        },
+    },
+}
+
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class BankCustomer(BaseModel):
-    name:             str   = Field("Jane Smith",  description="Customer name (used in LLM email)")
+    name:             str   = Field("Jane Smith",  min_length=1, max_length=100, description="Customer name (used in LLM email)")
     credit_score:     int   = Field(650,  ge=300, le=850,  description="FICO-style credit score")
-    geography:        str   = Field("France",              description="Country (mapped to France / Germany / Spain cluster)")
+    geography:        str   = Field("France",  min_length=1, max_length=100, description="Country (mapped to France / Germany / Spain cluster)")
     gender:           Literal["Male", "Female"] = Field("Female")
     age:              int   = Field(42,   ge=18, le=100)
     tenure:           int   = Field(5,    ge=0,  le=10,    description="Years with the bank")
@@ -87,15 +140,9 @@ class BankCustomer(BaseModel):
     is_active_member: Literal[0, 1] = Field(1,             description="1 = active member")
     estimated_salary: float = Field(85000.0, ge=0)
 
-    model_config = {"json_schema_extra": {"example": {
-        "name": "Jane Smith", "credit_score": 650, "geography": "France",
-        "gender": "Female", "age": 42, "tenure": 5, "balance": 75000,
-        "num_products": 2, "has_cr_card": 1, "is_active_member": 1, "estimated_salary": 85000,
-    }}}
-
 
 class TelcoCustomer(BaseModel):
-    name:             str   = Field("John Rivera")
+    name:             str   = Field("John Rivera", min_length=1, max_length=100)
     gender:           Literal["Male", "Female"] = Field("Male")
     senior_citizen:   Literal[0, 1] = Field(0)
     partner:          Literal["Yes", "No"] = Field("No")
@@ -119,24 +166,12 @@ class TelcoCustomer(BaseModel):
     monthly_charges:  float = Field(89.85, ge=0)
     total_charges:    float = Field(1078.20, ge=0)
 
-    model_config = {"json_schema_extra": {"example": {
-        "name": "John Rivera", "gender": "Male", "senior_citizen": 0,
-        "partner": "No", "dependents": "No", "tenure": 12,
-        "phone_service": "Yes", "multiple_lines": "No",
-        "internet_service": "Fiber optic", "online_security": "No",
-        "online_backup": "No", "device_protection": "No", "tech_support": "No",
-        "streaming_tv": "Yes", "streaming_movies": "Yes",
-        "contract": "Month-to-month", "paperless_billing": "Yes",
-        "payment_method": "Electronic check",
-        "monthly_charges": 89.85, "total_charges": 1078.20,
-    }}}
-
 
 class PredictionResponse(BaseModel):
-    churn_probability: float = Field(description="Average churn probability across all models (0–1)")
-    risk_level:        str   = Field(description="low / medium / high")
-    model_scores:      dict  = Field(description="Per-model churn probabilities")
-    dataset:           str   = Field(description="Which dataset's models were used")
+    churn_probability: float                        = Field(ge=0.0, le=1.0, description="Average churn probability across all models (0–1)")
+    risk_level:        Literal["low", "medium", "high"] = Field(description="Bucketed risk label: low < 0.4, medium 0.4–0.69, high ≥ 0.7")
+    model_scores:      dict[str, float]             = Field(description="Per-model churn probabilities")
+    dataset:           Literal["bank", "telco"]     = Field(description="Which dataset's models were used")
 
 
 def _risk(p: float) -> str:
@@ -163,7 +198,12 @@ def list_models():
     }
 
 
-@app.post("/predict/bank", response_model=PredictionResponse, tags=["Prediction"])
+@app.post(
+    "/predict/bank",
+    response_model=PredictionResponse,
+    tags=["Prediction"],
+    openapi_extra={"requestBody": {"content": {"application/json": {"examples": _BANK_EXAMPLES}}}},
+)
 def predict_bank(customer: BankCustomer):
     """
     Predict churn probability for a **bank customer**.
@@ -200,7 +240,12 @@ def predict_bank(customer: BankCustomer):
     )
 
 
-@app.post("/predict/telco", response_model=PredictionResponse, tags=["Prediction"])
+@app.post(
+    "/predict/telco",
+    response_model=PredictionResponse,
+    tags=["Prediction"],
+    openapi_extra={"requestBody": {"content": {"application/json": {"examples": _TELCO_EXAMPLES}}}},
+)
 def predict_telco_endpoint(customer: TelcoCustomer):
     """
     Predict churn probability for a **telco customer**.
