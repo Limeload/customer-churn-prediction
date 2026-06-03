@@ -1,0 +1,20 @@
+.git
+.gitignore
+.env
+.env.*
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Training artifacts not needed by the API server
+notebooks/
+data/
+training/
+
+# Test files
+test_unit.py
+test_api.py
