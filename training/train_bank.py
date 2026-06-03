@@ -134,6 +134,7 @@ for name, obj in saves.items():
 import json, sklearn, xgboost as xgb_lib
 
 schema = {
+    "schema_version": 1,
     "feature_columns": list(X.columns),
     "n_features": int(X.shape[1]),
     "trained_with": {

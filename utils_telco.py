@@ -8,25 +8,83 @@ from huggingface_hub import hf_hub_download
 HF_REPO_ID = os.getenv("HF_REPO_ID", "shraddharaom/churnguard-models")
 logger = logging.getLogger(__name__)
 
+_SCHEMA_VERSION = 1
+
+
+def _hf_path(local_path: str) -> str:
+    """Convert a local models/ path to its HuggingFace Hub filename."""
+    if not local_path.startswith("models/"):
+        raise ValueError(
+            f"Cannot derive HuggingFace path for {local_path!r}: "
+            "expected a path beginning with 'models/'"
+        )
+    return local_path.removeprefix("models/")
+
 
 def _load_pkl(local_path: str) -> object:
     if os.path.exists(local_path):
-        with open(local_path, "rb") as f:
+        logger.debug("Loading %s from local disk", local_path)
+        try:
+            with open(local_path, "rb") as f:
+                return pickle.load(f)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to deserialize local file {local_path!r}: {exc}"
+            ) from exc
+
+    hf_file = _hf_path(local_path)
+    logger.info(
+        "Local file %r not found — downloading %r from HuggingFace Hub (repo=%s)",
+        local_path, hf_file, HF_REPO_ID,
+    )
+    try:
+        cached = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
+    except Exception as exc:
+        raise RuntimeError(
+            f"HuggingFace Hub download failed for {hf_file!r} "
+            f"(repo={HF_REPO_ID!r}): {exc}"
+        ) from exc
+    try:
+        with open(cached, "rb") as f:
             return pickle.load(f)
-    hf_file = local_path.removeprefix("models/")
-    path = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
-    with open(path, "rb") as f:
-        return pickle.load(f)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to deserialize {hf_file!r} after downloading from HuggingFace "
+            f"(cached at {cached!r}): {exc}"
+        ) from exc
 
 
 def _load_json(local_path: str) -> dict:
     if os.path.exists(local_path):
-        with open(local_path) as f:
+        logger.debug("Loading %s from local disk", local_path)
+        try:
+            with open(local_path) as f:
+                return json.load(f)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to parse local JSON {local_path!r}: {exc}"
+            ) from exc
+
+    hf_file = _hf_path(local_path)
+    logger.info(
+        "Local file %r not found — downloading %r from HuggingFace Hub (repo=%s)",
+        local_path, hf_file, HF_REPO_ID,
+    )
+    try:
+        cached = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
+    except Exception as exc:
+        raise RuntimeError(
+            f"HuggingFace Hub download failed for {hf_file!r} "
+            f"(repo={HF_REPO_ID!r}): {exc}"
+        ) from exc
+    try:
+        with open(cached) as f:
             return json.load(f)
-    hf_file = local_path.removeprefix("models/")
-    path = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_file)
-    with open(path) as f:
-        return json.load(f)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to parse JSON {hf_file!r} after downloading from HuggingFace "
+            f"(cached at {cached!r}): {exc}"
+        ) from exc
 
 TELCO_MODELS = {
     'XGBoost':           'models/telco/xgboost.pkl',
@@ -55,6 +113,15 @@ def validate_telco_schema() -> None:
     except Exception:
         logger.warning("models/telco/schema.json not found — retrain to generate feature schema")
         return
+
+    ver = schema.get("schema_version")
+    if ver is None:
+        logger.warning("telco schema.json has no schema_version field — retrain to add it")
+    elif ver != _SCHEMA_VERSION:
+        raise RuntimeError(
+            f"Telco schema version mismatch: inference code expects {_SCHEMA_VERSION}, "
+            f"schema.json has {ver}. Retrain or upgrade inference code."
+        )
 
     saved_cols = schema.get("feature_columns", [])
     if saved_cols != FEATURE_COLS:
