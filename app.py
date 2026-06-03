@@ -2,13 +2,17 @@ import os
 import json
 import requests as http
 from flask import Flask, request, jsonify, render_template, send_from_directory
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from openai import OpenAI
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from notebook_runner import run_notebook
 
 load_dotenv()
 
 app = Flask(__name__)
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
 
 RENDER_API = os.getenv("RENDER_API_URL", "https://customer-churn-prediction-02k2.onrender.com")
 
@@ -243,6 +247,7 @@ _MAX_NB_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 @app.route("/train/run", methods=["POST"])
+@limiter.limit("10 per hour")
 def train_run():
     if not _TRAIN_KEY:
         return jsonify({"error": "Notebook execution is disabled (TRAIN_API_KEY not configured)"}), 503
@@ -252,6 +257,9 @@ def train_run():
         if "notebook" not in request.files:
             return jsonify({"error": "No file provided"}), 400
         nb_file = request.files["notebook"]
+        filename = secure_filename(nb_file.filename or "")
+        if not filename.lower().endswith(".ipynb"):
+            return jsonify({"error": "Only .ipynb files are accepted"}), 400
         raw = nb_file.read()
         if len(raw) > _MAX_NB_BYTES:
             return jsonify({"error": "Notebook exceeds 5 MB limit"}), 413
