@@ -4,6 +4,8 @@ Predicts customer churn using an ensemble of ML models, explains the result with
 
 Supports two datasets: **Bank** (7 models) and **Telco** (5 models).
 
+See [REQUIREMENTS.md](REQUIREMENTS.md) for a full feature list and requirement-to-code traceability map.
+
 ## Setup
 
 ```bash
