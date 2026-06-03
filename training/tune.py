@@ -2,15 +2,20 @@
 Enhanced hyperparameter tuning with RandomizedSearchCV.
 Wider parameter distributions, more iterations than initial GridSearch.
 Replaces model pkl files with the best-found estimators.
+
+Usage:
+  python training/tune.py                          # defaults
+  python training/tune.py --n-iter 10 --cv-folds 3 # fast smoke-test
+  python training/tune.py --models XGBoost SVM     # subset of models
+  python training/tune.py --verbose 1              # per-iteration logging
 """
+import argparse
 import pickle
+import time
 from pathlib import Path
+
 import pandas as pd
 import numpy as np
-
-ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "data"
-MDIR = ROOT / "models" / "bank"
 from scipy.stats import randint, uniform, loguniform
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -24,9 +29,47 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
 
-np.random.seed(42)
-N_ITER = 30       # candidates per model
-CV     = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+try:
+    from tqdm import tqdm as _tqdm
+    def _progress(items, **kw):
+        return _tqdm(list(items), **kw)
+except ImportError:
+    def _progress(items, **kw):
+        return items
+
+ROOT = Path(__file__).resolve().parent.parent
+DATA = ROOT / "data"
+MDIR = ROOT / "models" / "bank"
+
+_ALL_MODELS = ["XGBoost", "Random Forest", "Gradient Boosting", "Decision Tree", "SVM", "KNN"]
+
+
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Hyperparameter tuning for ChurnGuard bank models",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument("--n-iter",   type=int, default=30,  metavar="N",
+                   help="RandomizedSearchCV candidates per model")
+    p.add_argument("--cv-folds", type=int, default=5,   metavar="K",
+                   help="Stratified cross-validation folds")
+    p.add_argument("--jobs",     type=int, default=-1,  metavar="N",
+                   help="Parallel jobs (-1 = all CPUs)")
+    p.add_argument("--verbose",  type=int, default=0,   choices=[0, 1, 2, 3],
+                   help="Sklearn verbosity level passed to RandomizedSearchCV")
+    p.add_argument("--models",   nargs="+", default=None, metavar="NAME",
+                   choices=_ALL_MODELS,
+                   help="Subset of models to tune (default: all)")
+    return p.parse_args()
+
+
+args   = _parse_args()
+N_ITER = args.n_iter
+CV     = StratifiedKFold(n_splits=args.cv_folds, shuffle=True, random_state=42)
+
+print(f"Config: n_iter={N_ITER}, cv_folds={args.cv_folds}, jobs={args.jobs}, verbose={args.verbose}")
+if args.models:
+    print(f"Tuning subset: {args.models}")
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 print("Loading bank churn dataset…")
@@ -150,39 +193,52 @@ spaces = {
 }
 
 # ── Run RandomizedSearchCV ────────────────────────────────────────────────────
-print(f"\n── RandomizedSearchCV (n_iter={N_ITER} per model) ──────────────────────")
+to_tune = {k: v for k, v in spaces.items() if not args.models or k in args.models}
+print(f"\n── RandomizedSearchCV (n_iter={N_ITER}, cv={args.cv_folds}) ─────────────")
 best_estimators = {}
+t_total = time.perf_counter()
 
-for name, (estimator, param_dist, Xtr, Xte) in spaces.items():
-    print(f"  Tuning {name}…", end=" ", flush=True)
+for name, (estimator, param_dist, Xtr, Xte) in _progress(
+    to_tune.items(), desc="Tuning models", unit="model", leave=True
+):
+    t0 = time.perf_counter()
+    print(f"\n  [{name}] starting search (n_iter={N_ITER}) …", flush=True)
     search = RandomizedSearchCV(
         estimator, param_dist,
         n_iter=N_ITER, cv=CV, scoring="roc_auc",
-        n_jobs=-1, random_state=42, verbose=0,
+        n_jobs=args.jobs, random_state=42, verbose=args.verbose,
     )
     search.fit(Xtr, y_train)
-    best = search.best_estimator_
-    best_estimators[name] = (best, Xte)
-    print(f"cv_auc={search.best_score_:.4f}  params={search.best_params_}")
+    elapsed = time.perf_counter() - t0
+    best_estimators[name] = (search.best_estimator_, Xte)
+    print(f"  [{name}] cv_auc={search.best_score_:.4f}  elapsed={elapsed:.1f}s")
+    print(f"  [{name}] best_params={search.best_params_}")
 
 # ── Results after tuning ──────────────────────────────────────────────────────
 print("\n── After tuning ─────────────────────────────────────────────────────")
 for name, (model, Xte) in best_estimators.items():
     results_after[name] = report(name, model, Xte, tag="tuned")
 
-# ── Rebuild Stacking with newly tuned base models ─────────────────────────────
-print("\n  Rebuilding Stacking ensemble with tuned base models…")
-stacking = StackingClassifier(
-    estimators=[
-        ("xgb", best_estimators["XGBoost"][0]),
-        ("rf",  best_estimators["Random Forest"][0]),
-        ("gbm", best_estimators["Gradient Boosting"][0]),
-    ],
-    final_estimator=LogisticRegression(max_iter=1000, random_state=42),
-    cv=3, passthrough=False, n_jobs=-1,
-)
-stacking.fit(X_train, y_train)
-results_after["Stacking"] = report("Stacking", stacking, X_test, tag="tuned")
+# ── Rebuild Stacking with newly tuned base models (only when all three are present)
+_stack_bases = {"XGBoost", "Random Forest", "Gradient Boosting"}
+if _stack_bases.issubset(best_estimators):
+    print("\n  Rebuilding Stacking ensemble with tuned base models…")
+    t0 = time.perf_counter()
+    stacking = StackingClassifier(
+        estimators=[
+            ("xgb", best_estimators["XGBoost"][0]),
+            ("rf",  best_estimators["Random Forest"][0]),
+            ("gbm", best_estimators["Gradient Boosting"][0]),
+        ],
+        final_estimator=LogisticRegression(max_iter=1000, random_state=42),
+        cv=3, passthrough=False, n_jobs=args.jobs,
+    )
+    stacking.fit(X_train, y_train)
+    print(f"  [Stacking] elapsed={time.perf_counter() - t0:.1f}s")
+    results_after["Stacking"] = report("Stacking", stacking, X_test, tag="tuned")
+else:
+    stacking = None
+    print("\n  Skipping Stacking rebuild (not all base models were tuned).")
 
 # ── Delta summary ─────────────────────────────────────────────────────────────
 print("\n" + "="*72)
@@ -195,20 +251,25 @@ for name in results_before:
     arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "─")
     print(f"  {name:<26} {b:>11.4f} {a:>10.4f} {arrow} {abs(delta):.4f}")
 print("="*72)
+print(f"\nTotal tuning time: {time.perf_counter() - t_total:.1f}s")
 
 # ── Save improved models ──────────────────────────────────────────────────────
 print("\nSaving tuned models…")
-saves = {
-    "xgboost_model.pkl":           best_estimators["XGBoost"][0],
-    "random_forest_model.pkl":     best_estimators["Random Forest"][0],
-    "gradient_boosting_model.pkl": best_estimators["Gradient Boosting"][0],
-    "decision_tree_model.pkl":     best_estimators["Decision Tree"][0],
-    "svm_model.pkl":               best_estimators["SVM"][0],
-    "knn_model.pkl":               best_estimators["KNN"][0],
-    "stacking_model.pkl":          stacking,
-    "scaler.pkl":                  scaler,
+_filename_map = {
+    "XGBoost":           "xgboost_model.pkl",
+    "Random Forest":     "random_forest_model.pkl",
+    "Gradient Boosting": "gradient_boosting_model.pkl",
+    "Decision Tree":     "decision_tree_model.pkl",
+    "SVM":               "svm_model.pkl",
+    "KNN":               "knn_model.pkl",
 }
-for name, obj in saves.items():
-    with open(MDIR / name, "wb") as f:
+saves = {_filename_map[n]: est for n, (est, _) in best_estimators.items()}
+if stacking:
+    saves["stacking_model.pkl"] = stacking
+saves["scaler.pkl"] = scaler
+
+for fname, obj in saves.items():
+    with open(MDIR / fname, "wb") as f:
         pickle.dump(obj, f)
-print(f"All tuned models saved to {MDIR}")
+    print(f"  saved {fname}")
+print(f"Done. {len(saves)} files written to {MDIR}")
