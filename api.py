@@ -8,11 +8,17 @@ Endpoints:
   POST /train/run        execute an uploaded .ipynb notebook
   GET  /docs             auto-generated Swagger UI
 """
+import logging
 import os
 import re
+import sys
 import tempfile
 import warnings
 warnings.filterwarnings("ignore")
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s — %(message)s")
+logger = logging.getLogger("churnguard")
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
@@ -29,6 +35,7 @@ def _require_train_key(key: str | None = Depends(_api_key_header)) -> None:
         raise HTTPException(status_code=503, detail="Notebook execution is disabled (TRAIN_API_KEY not configured)")
     if key != _TRAIN_KEY:
         raise HTTPException(status_code=403, detail="Invalid or missing X-Train-Key header")
+
 import numpy as np
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
@@ -61,10 +68,19 @@ app.add_middleware(
 )
 
 # ── Load models once at startup ───────────────────────────────────────────────
-bank_models  = load_models()
-bank_scaler  = load_scaler()
-telco_models = load_telco_models()
-telco_scaler = load_telco_scaler()
+def _load_or_exit(loader, label):
+    try:
+        artifact = loader()
+        logger.info("Loaded %s", label)
+        return artifact
+    except Exception as exc:
+        logger.critical("Failed to load %s: %s", label, exc)
+        sys.exit(1)
+
+bank_models  = _load_or_exit(load_models,       "bank models (7)")
+bank_scaler  = _load_or_exit(load_scaler,       "bank scaler")
+telco_models = _load_or_exit(load_telco_models, "telco models (5)")
+telco_scaler = _load_or_exit(load_telco_scaler, "telco scaler")
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class BankCustomer(BaseModel):
