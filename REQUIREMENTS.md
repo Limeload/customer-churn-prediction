@@ -35,7 +35,16 @@ Given structured bank customer data (11 fields), the system must return a churn 
 | Inference | `predict_all()` → [utils.py](utils.py) |
 | Flask UI route | `POST /predict` → [app.py:90](app.py#L90) |
 | UI form | Bank tab → [templates/index.html](templates/index.html) |
-| Tests | `test_predict_bank_*` → [test_api.py:69](test_api.py#L69) |
+| Integration tests | `test_predict_bank_*` → [test_api.py:69](test_api.py#L69) |
+| Unit tests | `TestBankPayloadFromForm::test_is_active_form_field_maps_to_is_active_member` → [test_unit.py:74](test_unit.py#L74) |
+| | `TestBankPayloadFromForm::test_salary_form_field_maps_to_estimated_salary` → [test_unit.py:80](test_unit.py#L80) |
+| | `TestBankPayloadFromForm::test_numeric_type_coercions` → [test_unit.py:86](test_unit.py#L86) |
+| | `TestBankPayloadFromForm::test_defaults_applied_when_fields_absent` → [test_unit.py:93](test_unit.py#L93) |
+| | `TestBankCustomerData::test_has_cr_card_1_renders_as_yes` → [test_unit.py:112](test_unit.py#L112) |
+| | `TestBankCustomerData::test_has_cr_card_0_renders_as_no` → [test_unit.py:116](test_unit.py#L116) |
+| | `TestBankCustomerData::test_is_active_member_rendered_as_yes_no` → [test_unit.py:120](test_unit.py#L120) |
+| | `TestBankCustomerData::test_balance_formatted_with_dollar_and_commas` → [test_unit.py:124](test_unit.py#L124) |
+| | `TestBankCustomerData::test_salary_formatted_with_dollar_and_commas` → [test_unit.py:128](test_unit.py#L128) |
 
 **Input fields:** `credit_score`, `geography`, `gender`, `age`, `tenure`, `balance`, `num_products`, `has_cr_card`, `is_active_member`, `estimated_salary`, `name`
 
@@ -43,17 +52,29 @@ Given structured bank customer data (11 fields), the system must return a churn 
 
 ## REQ-02 — Telco Churn Prediction
 
-Given structured telco customer data (20 fields), the system must return a churn probability, per-model scores, a risk level, and a dataset label.
+Given structured telco customer data (20 fields), the system must return a churn probability, per-model scores, a risk level, and a dataset label. Unexpected categorical values must emit a warning log rather than silently producing a bad prediction.
 
 | Layer | Location |
 |---|---|
 | REST API | `POST /predict/telco` → [api.py:184](api.py#L184) |
 | Request schema | `TelcoCustomer` → [api.py:78](api.py#L78) |
 | Feature preprocessing | `preprocess_telco()` → [utils_telco.py](utils_telco.py) |
+| Categorical guard | `_warn_unexpected()` → [utils_telco.py](utils_telco.py) |
 | Inference | `predict_telco()` → [utils_telco.py](utils_telco.py) |
 | Flask UI route | `POST /predict-telco` → [app.py:142](app.py#L142) |
 | UI form | Telco tab → [templates/index.html](templates/index.html) |
-| Tests | `test_predict_telco_*` → [test_api.py:112](test_api.py#L112) |
+| Integration tests | `test_predict_telco_*` → [test_api.py:112](test_api.py#L112) |
+| Unit tests | `TestTelcoPayloadFromForm::test_all_required_fields_present` → [test_unit.py:151](test_unit.py#L151) |
+| | `TestTelcoPayloadFromForm::test_numeric_coercions` → [test_unit.py:163](test_unit.py#L163) |
+| | `TestTelcoPayloadFromForm::test_defaults_applied_when_fields_absent` → [test_unit.py:170](test_unit.py#L170) |
+| | `TestTelcoCustomerData::test_senior_citizen_1_renders_as_yes` → [test_unit.py:189](test_unit.py#L189) |
+| | `TestTelcoCustomerData::test_senior_citizen_0_renders_as_no` → [test_unit.py:193](test_unit.py#L193) |
+| | `TestTelcoCustomerData::test_monthly_charges_formatted` → [test_unit.py:198](test_unit.py#L198) |
+| | `TestTelcoCustomerData::test_total_charges_formatted` → [test_unit.py:202](test_unit.py#L202) |
+| | `TestWarnUnexpected::test_no_warning_for_all_valid_values` → [test_unit.py:213](test_unit.py#L213) |
+| | `TestWarnUnexpected::test_warning_for_invalid_gender` → [test_unit.py:227](test_unit.py#L227) |
+| | `TestWarnUnexpected::test_warning_for_invalid_contract` → [test_unit.py:231](test_unit.py#L231) |
+| | `TestWarnUnexpected::test_warning_for_invalid_payment_method` → [test_unit.py:236](test_unit.py#L236) |
 
 **Input fields:** `gender`, `senior_citizen`, `partner`, `dependents`, `tenure`, `phone_service`, `multiple_lines`, `internet_service`, `online_security`, `online_backup`, `device_protection`, `tech_support`, `streaming_tv`, `streaming_movies`, `contract`, `paperless_billing`, `payment_method`, `monthly_charges`, `total_charges`, `name`
 
@@ -100,11 +121,19 @@ Given prediction results and customer data, the system must generate a 2–4 sen
 
 | Layer | Location |
 |---|---|
-| System prompt | `SYSTEM_PROMPT` → [app.py:31](app.py#L31) |
-| LLM call | `get_llm_response()` → [app.py:59](app.py#L59) |
-| User message builder | `build_user_message()` → [app.py:73](app.py#L73) |
+| System prompt | `SYSTEM_PROMPT` → [llm_service.py](llm_service.py) |
+| LLM call | `get_llm_response()` → [llm_service.py](llm_service.py) |
+| User message builder | `build_user_message()` → [llm_service.py](llm_service.py) |
+| JSON parsing | `parse_llm_json()` → [llm_service.py](llm_service.py) |
 | Response field | `explanation` in `/predict` and `/predict-telco` responses |
-| Tests | None (requires live LLM key; validate manually via Swagger UI) |
+| Integration tests | None (requires live LLM key; validate manually via Swagger UI) |
+| Unit tests | `TestParseLlmJson::test_valid_json_string` → [test_unit.py:18](test_unit.py#L18) |
+| | `TestParseLlmJson::test_code_fenced_json` → [test_unit.py:24](test_unit.py#L24) |
+| | `TestParseLlmJson::test_code_fenced_with_language_tag` → [test_unit.py:29](test_unit.py#L29) |
+| | `TestParseLlmJson::test_invalid_json_returns_fallback` → [test_unit.py:34](test_unit.py#L34) |
+| | `TestBuildUserMessage::test_probability_formatted_as_percentage` → [test_unit.py:45](test_unit.py#L45) |
+| | `TestBuildUserMessage::test_contains_customer_data` → [test_unit.py:49](test_unit.py#L49) |
+| | `TestBuildUserMessage::test_contains_model_scores` → [test_unit.py:54](test_unit.py#L54) |
 
 ---
 
@@ -114,11 +143,13 @@ The system must generate a warm, personalized retention email addressed to the c
 
 | Layer | Location |
 |---|---|
-| Prompt instruction | `SYSTEM_PROMPT` → [app.py:31](app.py#L31) |
-| LLM call | `get_llm_response()` → [app.py:59](app.py#L59) |
-| JSON parsing | `parse_llm_json()` → [app.py:44](app.py#L44) |
+| Prompt instruction | `SYSTEM_PROMPT` → [llm_service.py](llm_service.py) |
+| LLM call | `get_llm_response()` → [llm_service.py](llm_service.py) |
+| JSON parsing | `parse_llm_json()` → [llm_service.py](llm_service.py) |
 | Response field | `email` in `/predict` and `/predict-telco` responses |
-| Tests | None (requires live LLM key; validate manually via UI) |
+| Integration tests | None (requires live LLM key; validate manually via UI) |
+| Unit tests | `TestParseLlmJson::test_valid_json_string` → [test_unit.py:18](test_unit.py#L18) _(shared with REQ-05)_ |
+| | `TestParseLlmJson::test_invalid_json_returns_fallback` → [test_unit.py:34](test_unit.py#L34) _(shared with REQ-05)_ |
 
 ---
 
@@ -128,8 +159,8 @@ Users must be able to choose between OpenAI GPT-4o and Groq Llama 3.3 70B from t
 
 | Layer | Location |
 |---|---|
-| Provider config | `LLM_CONFIGS` → [app.py:22](app.py#L22) |
-| Client factory | `_llm_client()` → [app.py:26](app.py#L26) |
+| Provider config | `LLM_CONFIGS` → [llm_service.py](llm_service.py) |
+| Client factory | `_llm_client()` → [llm_service.py](llm_service.py) |
 | UI controls | LLM radio buttons → [templates/index.html](templates/index.html) |
 | Response field | `llm_label` in prediction response |
 | Tests | None |
@@ -144,12 +175,20 @@ Users must be able to upload a `.ipynb` notebook, have it executed server-side, 
 |---|---|
 | REST API | `POST /train/run` → [api.py:208](api.py#L208) |
 | Flask UI route | `POST /train/run` → [app.py:251](app.py#L251) |
+| Execution engine | `run_notebook()` → [notebook_runner.py](notebook_runner.py) |
+| Output collector | `_collect_outputs()` → [notebook_runner.py](notebook_runner.py) |
 | UI page | [templates/train.html](templates/train.html) |
-| Notebook execution | `nbconvert.ExecutePreprocessor` |
 | Output types handled | `stream`, `execute_result`, `display_data` (text/html/image/png), `error` |
 | Authentication | `X-Train-Key` header must match `TRAIN_API_KEY` env var; endpoint returns 503 if var is unset |
 | Size limit | Notebooks larger than 5 MB are rejected with HTTP 413 |
-| Tests | None (requires kernel; validate by uploading a notebook in the UI) |
+| Integration tests | None (requires kernel; validate by uploading a notebook in the UI) |
+| Unit tests | `TestCollectOutputs::test_stream_stdout_collected` → [test_unit.py:253](test_unit.py#L253) |
+| | `TestCollectOutputs::test_empty_stream_text_not_collected` → [test_unit.py:261](test_unit.py#L261) |
+| | `TestCollectOutputs::test_error_output_collected` → [test_unit.py:268](test_unit.py#L268) |
+| | `TestCollectOutputs::test_image_output_collected` → [test_unit.py:281](test_unit.py#L281) |
+| | `TestCollectOutputs::test_non_code_cells_skipped` → [test_unit.py:293](test_unit.py#L293) |
+| | `TestCollectOutputs::test_html_output_collected` → [test_unit.py:300](test_unit.py#L300) |
+| | `TestCollectOutputs::test_ansi_codes_stripped_from_stream` → [test_unit.py:310](test_unit.py#L310) |
 
 > **Security note:** Notebook execution runs arbitrary uploaded Python code. The API key guard and size cap are a minimum baseline. For production, also run `ExecutePreprocessor` in an isolated container with `--network none` and CPU/memory limits.
 
@@ -215,23 +254,36 @@ The project must include scripts that train and serialize all models from the ra
 
 ## Test Coverage Summary
 
-| Requirement | Test count | Notes |
-|---|---|---|
-| REQ-01 Bank prediction | 5 | probability, risk, scores, label, high-risk profile |
-| REQ-02 Telco prediction | 5 | probability, risk, scores, label, low-risk profile |
-| REQ-03 Ensemble scoring | 2 | score count and 0–1 range |
-| REQ-04 Risk classification | 4 | label enum + boundary profiles |
-| REQ-05 LLM explanation | 0 | manual validation required |
-| REQ-06 Retention email | 0 | manual validation required |
-| REQ-07 LLM selection | 0 | manual validation required |
-| REQ-08 Notebook execution | 0 | manual validation required |
-| REQ-09 Health check | 1 | status + model counts |
-| REQ-10 Model listing | 1 | counts per dataset |
-| REQ-11 Input validation | 3 | invalid credit score, gender, contract |
-| REQ-12 Retraining scripts | 0 | artifact presence checked by REQ-09 |
+| Requirement | Integration | Unit | Unit test functions |
+|---|---|---|---|
+| REQ-01 Bank prediction | 5 | 9 | `TestBankPayloadFromForm` (4), `TestBankCustomerData` (5) |
+| REQ-02 Telco prediction | 5 | 11 | `TestTelcoPayloadFromForm` (3), `TestTelcoCustomerData` (4), `TestWarnUnexpected` (4) |
+| REQ-03 Ensemble scoring | 2 | 0 | — |
+| REQ-04 Risk classification | 4 | 0 | — |
+| REQ-05 LLM explanation | 0 | 7 | `TestParseLlmJson` (4), `TestBuildUserMessage` (3) |
+| REQ-06 Retention email | 0 | 2 | `TestParseLlmJson::test_valid_json_string`, `test_invalid_json_returns_fallback` |
+| REQ-07 LLM selection | 0 | 0 | manual validation required |
+| REQ-08 Notebook execution | 0 | 7 | `TestCollectOutputs` (7) |
+| REQ-09 Health check | 1 | 0 | — |
+| REQ-10 Model listing | 1 | 0 | — |
+| REQ-11 Input validation | 3 | 0 | — |
+| REQ-12 Retraining scripts | 0 | 0 | artifact presence checked by REQ-09 |
+| **Total** | **21** | **27** | |
 
-Run all integration tests against the live API:
+Run unit tests (no live server or API keys required):
+
+```bash
+pytest test_unit.py -v
+```
+
+Run integration tests against the live API:
 
 ```bash
 pytest test_api.py -v
+```
+
+Run the full suite:
+
+```bash
+pytest test_unit.py test_api.py -v
 ```
